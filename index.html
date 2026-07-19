@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>LINE風チャット (戻るボタン改善版)</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+        :root { --bg-color: #f0f2f5; --app-bg: #ffffff; --text-color: #000000; --msg-bg: #ffffff; }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg-color: #18191a; --app-bg: #242526; --text-color: #e4e6eb; --msg-bg: #3a3b3c; }
+        }
+        body { background: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #app { width: 100%; max-width: 450px; height: 100vh; background: var(--app-bg); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .screen { flex: 1; padding: 20px; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        .hidden { display: none !important; }
+        input[type="text"] { padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; width: 100%; background: inherit; color: inherit; }
+        button { padding: 10px; margin: 5px; border-radius: 8px; border: none; background: #007bff; color: white; cursor: pointer; font-weight: bold; }
+        .input-group { border: 1px dashed #ccc; padding: 10px; border-radius: 8px; margin: 5px 0; background: rgba(0,0,0,0.02); }
+        .input-group label { font-size: 12px; font-weight: bold; display: block; margin-bottom: 5px; }
+        .history-section { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px; flex: 1; overflow-y: auto; }
+        .history-item { display: flex; align-items: center; padding: 10px; background: rgba(0,0,0,0.05); margin-bottom: 8px; border-radius: 10px; cursor: pointer; }
+        .chat-icon { width: 32px; height: 32px; border-radius: 50%; margin-right: 8px; object-fit: cover; background: #ccc; }
+        
+        #message-area { flex: 1; overflow-y: auto; padding: 10px; background: rgba(0,0,0,0.03); display: flex; flex-direction: column; margin-bottom: 125px; }
+        .msg-container { display: flex; align-items: flex-start; margin: 8px 0; }
+        .msg-box { background: var(--msg-bg); padding: 10px; border-radius: 12px; max-width: 70%; word-break: break-all; }
+        .msg-name { font-size: 11px; color: #888; margin-bottom: 3px; }
+        .chat-img { width: 100%; max-width: 240px; border-radius: 8px; display: block; margin-top: 5px; }
+        .preview-circle { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; background: #ccc; margin: 5px 0; display: none; }
+
+        #progress-container { width: 100%; height: 6px; background: #ddd; border-radius: 3px; margin: 5px 0; display: none; }
+        #progress-bar { width: 0%; height: 100%; background: #28a745; border-radius: 3px; transition: width 0.1s; }
+
+        #call-area { display: flex; flex-direction: column; background: #000; padding: 10px; border-radius: 10px; margin-bottom: 10px; position: relative; }
+        .video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .video-window { width: 100%; height: 120px; background: #222; border-radius: 8px; object-fit: cover; }
+        .call-status { color: #fff; font-size: 12px; text-align: center; margin-bottom: 5px; }
+
+        .bottom-send-area { position: absolute; bottom: 0; left: 0; width: 100%; background: var(--app-bg); padding: 10px 20px; border-top: 1px solid #ccc; display: flex; flex-direction: column; z-index: 10; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="login-screen" class="screen">
+        <h2>LINE風チャット (通話機能付き)</h2>
+        <input type="text" id="name-input" placeholder="名前を入力">
+        <div class="input-group">
+            <label>👤 アイコン画像</label>
+            <input type="text" id="icon-input" placeholder="画像のURLを貼り付け">
+            <input type="file" id="icon-file" accept=".webp,.jpg,.jpeg,.png">
+            <img id="icon-preview" class="preview-circle">
+        </div>
+        <input type="text" id="room-input" placeholder="部屋ID">
+        <button id="join-btn">入室</button>
+        <div class="history-section"><div id="history-list"></div></div>
+    </div>
+
+    <div id="chat-screen" class="screen hidden">
+        <div style="display:flex; align-items:center; justify-content: space-between; border-bottom:1px solid #ccc; padding-bottom:8px; background: var(--app-bg); z-index: 10;">
+            <div style="display:flex; align-items:center;">
+                <button id="back-btn" style="background:#6c757d;">← 戻る</button>
+                <span id="room-title" style="margin-left:15px; font-weight:bold;">部屋: -</span>
+            </div>
+            <div>
+                <button id="start-call-btn" style="background:#28a745; margin:0;">📞 通話</button>
+                <button id="end-call-btn" style="background:#dc3545; margin:0;" class="hidden">❌ 切断</button>
+            </div>
+        </div>
+
+        <div id="call-area" class="hidden">
+            <div id="call-status" class="call-status">通話待機中...</div>
+            <div class="video-grid">
+                <div><div style="color:#fff; font-size:10px;">あなた</div><video id="local-video" class="video-window" autoplay muted playsinline></video></div>
+                <div><div style="color:#fff; font-size:10px;">相手</div><video id="remote-video" class="video-window" autoplay playsinline></video></div>
+            </div>
+        </div>
+        
+        <div id="message-area"></div>
+        
+        <div class="bottom-send-area">
+            <div id="progress-container"><div id="progress-bar"></div></div>
+            <div style="display:flex; align-items:center;">
+                <input type="text" id="msg-input" placeholder="メッセージ..." style="flex:1; margin:0;">
+                <button id="send-btn">送信</button>
+            </div>
+            <div style="display:flex; align-items:center; margin-top:5px; font-size:12px; gap:10px;">
+                <label style="cursor:pointer; background:#17a2b8; color:white; padding:5px 10px; border-radius:5px; font-weight:bold;">
+                    📷 写真を選択
+                    <input type="file" id="msg-file" accept="image/*" style="display:none;">
+                </label>
+                <span id="file-name" style="color:#888; max-width: 130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+<script>
+    let client = mqtt.connect('wss://test.mosquitto.org:8081');
+    let currentRoom = "", chatHistory = [], myRooms = [], currentIconData = "";
+    const defaultIcon = "https://cdn-icons-png.flaticon.com/512/847/847969.png";
+    let localStream = null, peerConnection = null;
+    let myCallId = Math.random().toString(36).substring(2, 11);
+    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+    // 🌟 【改善】「戻る」ボタンの共通処理
+    function goBack() {
+        closeCall();
+        document.getElementById("chat-screen").classList.add("hidden");
+        document.getElementById("login-screen").classList.remove("hidden");
+        currentRoom = "";
+    }
+
+    // 左上の「← 戻る」ボタン
+    document.getElementById("back-btn").onclick = () => goBack();
+
+    // 物理的な「戻るボタン」やスワイプ対応
+    window.onpopstate = () => goBack();
+
+    // 🌟 アップロード・MQTT処理など（そのまま）
+    async function uploadWithProgress(file) {
+        const container = document.getElementById("progress-container");
+        const bar = document.getElementById("progress-bar");
+        container.style.display = "block";
+        return new Promise((resolve) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "https://tmpfiles.org/api/v1/upload");
+            xhr.upload.onprogress = (e) => { if (e.lengthComputable) bar.style.width = Math.round((e.loaded / e.total) * 100) + "%"; };
+            xhr.onload = () => { container.style.display = "none"; try { resolve(JSON.parse(xhr.responseText).data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")); } catch(e) { resolve(null); } };
+            const formData = new FormData(); formData.append("file", file); xhr.send(formData);
+        });
+    }
+
+    client.on('message', async (topic, message) => {
+        const name = document.getElementById("name-input").value;
+        if(name && topic === "user_profile/" + name) { currentIconData = message.toString(); document.getElementById("icon-preview").src = currentIconData || defaultIcon; document.getElementById("icon-preview").style.display = "block"; }
+        if(name && topic === "user_rooms/" + name) { try { myRooms = JSON.parse(message.toString()); renderHistoryList(myRooms); } catch(e) {} }
+        if(currentRoom && topic === "room_history/" + currentRoom) { try { chatHistory = JSON.parse(message.toString()); renderMessages(); } catch(e) {} }
+        if(currentRoom && topic === "room_call/" + currentRoom) {
+            const data = JSON.parse(message.toString());
+            if (data.sender === myCallId) return;
+            if (data.type === "offer") {
+                if (!localStream && confirm("📞 着信！通話に出る？")) await startCallFlow(data.video ? {video: true, audio: true} : {video: false, audio: true});
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                client.publish("room_call/" + currentRoom, JSON.stringify({ type: "answer", sdp: answer, sender: myCallId }));
+            } else if (data.type === "answer" && peerConnection) { await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp)); }
+            else if (data.type === "candidate" && peerConnection) { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); }
+            else if (data.type === "hangup") { closeCall(); alert("相手が切断しました"); }
+        }
+    });
+
+    async function startCallFlow(constraints) {
+        document.getElementById("call-area").classList.remove("hidden");
+        document.getElementById("start-call-btn").classList.add("hidden");
+        document.getElementById("end-call-btn").classList.remove("hidden");
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            document.getElementById("local-video").srcObject = localStream;
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            peerConnection.onicecandidate = (e) => { if(e.candidate) client.publish("room_call/" + currentRoom, JSON.stringify({ type: "candidate", candidate: e.candidate, sender: myCallId })); };
+            peerConnection.ontrack = (e) => { document.getElementById("remote-video").srcObject = e.streams[0]; };
+        } catch(e) { alert("カメラ/マイクが使えません"); }
+    }
+
+    document.getElementById("start-call-btn").onclick = async () => {
+        const video = confirm("ビデオ通話にする？");
+        await startCallFlow({video: video, audio: true});
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        client.publish("room_call/" + currentRoom, JSON.stringify({ type: "offer", sdp: offer, video: video, sender: myCallId }));
+    };
+
+    document.getElementById("end-call-btn").onclick = () => { client.publish("room_call/" + currentRoom, JSON.stringify({ type: "hangup", sender: myCallId })); closeCall(); };
+
+    function closeCall() {
+        if (peerConnection) { peerConnection.close(); peerConnection = null; }
+        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+        document.getElementById("call-area").classList.add("hidden");
+        document.getElementById("start-call-btn").classList.remove("hidden");
+        document.getElementById("end-call-btn").classList.add("hidden");
+    }
+
+    function renderMessages() {
+        const area = document.getElementById("message-area"); area.innerHTML = "";
+        chatHistory.forEach(data => {
+            const container = document.createElement("div"); container.className = "msg-container";
+            container.innerHTML = `<img class="chat-icon" src="${data.icon || defaultIcon}"><div><div class="msg-name">${data.name}</div><div class="msg-box"><div>${data.text}</div>${data.cloudUrl ? `<img class="chat-img" src="${data.cloudUrl}">` : ''}</div></div>`;
+            area.appendChild(container);
+        });
+        area.scrollTop = area.scrollHeight;
+    }
+
+    function renderHistoryList(rooms) {
+        const listDiv = document.getElementById("history-list"); listDiv.innerHTML = "";
+        rooms.forEach(r => { const item = document.createElement("div"); item.className = "history-item"; item.textContent = "部屋: " + r; item.onclick = () => { document.getElementById("room-input").value = r; joinRoom(r); }; listDiv.appendChild(item); });
+    }
+
+    function joinRoom(room) {
+        const name = document.getElementById("name-input").value;
+        if(!room || !name) return alert("名前と部屋IDを入れてね！");
+        if (!myRooms.includes(room)) { myRooms.push(room); client.publish("user_rooms/" + name, JSON.stringify(myRooms), {retain: true}); }
+        currentRoom = room; document.getElementById("room-title").textContent = "部屋: " + room;
+        client.subscribe("room_call/" + room);
+        client.subscribe("room_history/" + room, () => {
+            document.getElementById("login-screen").classList.add("hidden");
+            document.getElementById("chat-screen").classList.remove("hidden");
+            window.history.pushState("chat", null, ""); // 履歴を追加
+        });
+    }
+
+    document.getElementById("join-btn").onclick = () => joinRoom(document.getElementById("room-input").value);
+    document.getElementById("send-btn").onclick = async () => {
+        const name = document.getElementById("name-input").value;
+        const icon = currentIconData || defaultIcon;
+        const file = document.getElementById("msg-file").files[0];
+        const cloudUrl = file ? await uploadWithProgress(file) : "";
+        const msg = { name, icon, text: document.getElementById("msg-input").value, cloudUrl };
+        if(!msg.text && !msg.cloudUrl) return;
+        chatHistory = [...chatHistory, msg].slice(-30);
+        renderMessages();
+        client.publish("room_history/" + currentRoom, JSON.stringify(chatHistory), {retain: true});
+        document.getElementById("msg-input").value = "";
+        document.getElementById("msg-file").value = "";
+        document.getElementById("file-name").textContent = "";
+    };
+</script>
+</body>
+</html>
