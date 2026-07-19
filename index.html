@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>LINE風チャット (写真表示修正版)</title>
+    <title>LINE風チャット (部屋消去＆送信取り消し機能付き)</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
         :root { --bg-color: #f0f2f5; --app-bg: #ffffff; --text-color: #000000; --msg-bg: #ffffff; }
@@ -18,12 +18,14 @@
         .input-group { border: 1px dashed #ccc; padding: 10px; border-radius: 8px; margin: 5px 0; background: rgba(0,0,0,0.02); }
         .input-group label { font-size: 12px; font-weight: bold; display: block; margin-bottom: 5px; }
         .history-section { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px; flex: 1; overflow-y: auto; }
-        .history-item { display: flex; align-items: center; padding: 10px; background: rgba(0,0,0,0.05); margin-bottom: 8px; border-radius: 10px; cursor: pointer; }
+        .history-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: rgba(0,0,0,0.05); margin-bottom: 8px; border-radius: 10px; }
+        .room-click-area { flex: 1; display: flex; align-items: center; cursor: pointer; }
         .chat-icon { width: 32px; height: 32px; border-radius: 50%; margin-right: 8px; object-fit: cover; background: #ccc; }
         
         #message-area { flex: 1; overflow-y: auto; padding: 10px; background: rgba(0,0,0,0.03); display: flex; flex-direction: column; margin-bottom: 125px; }
         .msg-container { display: flex; align-items: flex-start; margin: 8px 0; }
-        .msg-box { background: var(--msg-bg); padding: 10px; border-radius: 12px; max-width: 70%; word-break: break-all; }
+        .msg-box { background: var(--msg-bg); padding: 10px; border-radius: 12px; max-width: 70%; word-break: break-all; cursor: pointer; position: relative; }
+        .msg-box:hover { opacity: 0.9; }
         .msg-name { font-size: 11px; color: #888; margin-bottom: 3px; }
         .chat-img { width: 100%; max-width: 240px; border-radius: 8px; display: block; margin-top: 5px; }
         .preview-circle { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; background: #ccc; margin: 5px 0; display: none; }
@@ -37,13 +39,14 @@
         .call-status { color: #fff; font-size: 12px; text-align: center; margin-bottom: 5px; }
 
         .bottom-send-area { position: absolute; bottom: 0; left: 0; width: 100%; background: var(--app-bg); padding: 10px 20px; border-top: 1px solid #ccc; display: flex; flex-direction: column; z-index: 10; }
+        .delete-room-btn { background: #dc3545; padding: 5px 10px; font-size: 12px; margin: 0; border-radius: 6px; }
     </style>
 </head>
 <body>
 
 <div id="app">
     <div id="login-screen" class="screen">
-        <h2>LINE風チャット (通話機能付き)</h2>
+        <h2>LINE風チャット</h2>
         <input type="text" id="name-input" placeholder="名前を入力">
         <div class="input-group">
             <label>👤 アイコン画像</label>
@@ -59,12 +62,13 @@
     <div id="chat-screen" class="screen hidden">
         <div style="display:flex; align-items:center; justify-content: space-between; border-bottom:1px solid #ccc; padding-bottom:8px; background: var(--app-bg); z-index: 10;">
             <div style="display:flex; align-items:center;">
-                <button id="back-btn" style="background:#6c757d;">← 戻る</button>
-                <span id="room-title" style="margin-left:15px; font-weight:bold;">部屋: -</span>
+                <button id="back-btn" style="background:#6c757d; margin:2px;">← 戻る</button>
+                <span id="room-title" style="margin-left:10px; font-weight:bold; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">部屋: -</span>
             </div>
-            <div>
-                <button id="start-call-btn" style="background:#28a745; margin:0;">📞 通話</button>
-                <button id="end-call-btn" style="background:#dc3545; margin:0;" class="hidden">❌ 切断</button>
+            <div style="display:flex; align-items:center; gap:4px;">
+                <button id="start-call-btn" style="background:#28a745; margin:0; padding:8px 10px; font-size:13px;">📞 通話</button>
+                <button id="end-call-btn" style="background:#dc3545; margin:0; padding:8px 10px; font-size:13px;" class="hidden">❌ 切断</button>
+                <button id="delete-this-room-btn" style="background:#dc3545; margin:0; padding:8px 10px; font-size:13px;">🗑️ 部屋削除</button>
             </div>
         </div>
 
@@ -81,7 +85,7 @@
         <div class="bottom-send-area">
             <div id="progress-container"><div id="progress-bar"></div></div>
             <div style="display:flex; align-items:center;">
-                <input type="text" id="msg-input" placeholder="メッセージ...">
+                <input type="text" id="msg-input" placeholder="メッセージ..." style="flex:1; margin:0;">
                 <button id="send-btn">送信</button>
             </div>
             <div style="display:flex; align-items:center; margin-top:5px; font-size:12px; gap:10px;">
@@ -114,7 +118,6 @@
     document.getElementById("back-btn").onclick = () => goBack();
     window.onpopstate = () => goBack();
 
-    // 🌟 【修正】tmpfiles.org の正しい直リンクURL（/dl/）に変換するアップローダー
     async function uploadWithProgress(file) {
         const container = document.getElementById("progress-container");
         const bar = document.getElementById("progress-bar");
@@ -129,22 +132,16 @@
                 try { 
                     const res = JSON.parse(xhr.responseText);
                     if (res && res.data && res.data.url) {
-                        // tmpfiles.org/xxxx を tmpfiles.org/dl/xxxx に変換して直接画像を表示できるようにする
                         const directUrl = res.data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
                         resolve(directUrl);
-                    } else {
-                        resolve("");
-                    }
-                } catch(e) { 
-                    resolve(""); 
-                } 
+                    } else { resolve(""); }
+                } catch(e) { resolve(""); } 
             };
             xhr.onerror = () => { container.style.display = "none"; resolve(""); };
             const formData = new FormData(); formData.append("file", file); xhr.send(formData);
         });
     }
 
-    // 画像アイコン圧縮用
     function compressImage(file) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -185,15 +182,16 @@
         const name = document.getElementById("name-input").value;
         if(name && topic === "user_profile/" + name) { currentIconData = message.toString(); document.getElementById("icon-preview").src = currentIconData || defaultIcon; document.getElementById("icon-preview").style.display = "block"; }
         if(name && topic === "user_rooms/" + name) { try { myRooms = JSON.parse(message.toString()); renderHistoryList(myRooms); } catch(e) {} }
-        
-        // 🌟 MQTTからクラウド上のメッセージ履歴を受信した時に画面を更新する
         if(currentRoom && topic === "room_history/" + currentRoom) { 
             try { 
                 chatHistory = JSON.parse(message.toString()); 
                 renderMessages(); 
-            } catch(e) {} 
+            } catch(e) {
+                // メッセージデータが空（削除された）場合
+                chatHistory = [];
+                renderMessages();
+            } 
         }
-        
         if(currentRoom && topic === "room_call/" + currentRoom) {
             const data = JSON.parse(message.toString());
             if (data.sender === myCallId) return;
@@ -241,29 +239,95 @@
         document.getElementById("end-call-btn").classList.add("hidden");
     }
 
-    // 🌟 【修正】メッセージと写真を正しく組み立てて表示する処理
+    function deleteMessage(msgId) {
+        const myName = document.getElementById("name-input").value;
+        const msgIndex = chatHistory.findIndex(m => m.msgId === msgId);
+        
+        if (msgIndex !== -1) {
+            if (chatHistory[msgIndex].name !== myName) {
+                alert("他の人が送信したメッセージは取り消せません！");
+                return;
+            }
+            
+            if (confirm("このメッセージの送信を取り消しますか？")) {
+                chatHistory.splice(msgIndex, 1);
+                client.publish("room_history/" + currentRoom, JSON.stringify(chatHistory), {retain: true});
+            }
+        }
+    }
+
+    // 🌟 【追加】部屋とクラウド上のメッセージ履歴を完全に消す関数（2段階確認）
+    function deleteRoomEntirely(roomName) {
+        const name = document.getElementById("name-input").value;
+        if (!name) return;
+
+        // 1回目確認
+        if (confirm(`⚠️ 本当に部屋「${roomName}」とすべてのチャット履歴を削除しますか？`)) {
+            // 2回目確認
+            if (confirm("🚨 本当に削除してよろしいですか？サーバーからすべてのMSGIDデータが消去され、元に戻せません！")) {
+                
+                // 1. クラウド(MQTTサーバー)の保持データを空データにして上書き消去
+                client.publish("room_history/" + roomName, "", {retain: true});
+                
+                // 2. 自分の部屋リストから除外
+                myRooms = myRooms.filter(r => r !== roomName);
+                client.publish("user_rooms/" + name, JSON.stringify(myRooms), {retain: true});
+                
+                alert(`部屋「${roomName}」の全データを消去しました。`);
+                
+                // もし今開いている部屋だったらロビーに戻す
+                if (currentRoom === roomName) {
+                    goBack();
+                } else {
+                    renderHistoryList(myRooms);
+                }
+            }
+        }
+    }
+
+    // チャット画面内の「部屋削除」ボタンイベント紐付け
+    document.getElementById("delete-this-room-btn").onclick = () => {
+        if (currentRoom) deleteRoomEntirely(currentRoom);
+    };
+
     function renderMessages() {
         const area = document.getElementById("message-area"); 
         area.innerHTML = "";
+        const myName = document.getElementById("name-input").value;
+
+        if (!chatHistory || chatHistory.length === 0) {
+            area.innerHTML = `<div style="text-align:center; color:#888; margin-top:20px; font-size:12px;">メッセージがありません</div>`;
+            return;
+        }
+
         chatHistory.forEach(data => {
             const container = document.createElement("div"); 
             container.className = "msg-container";
             
-            // テキスト用のHTML構造
-            let innerContent = `<div>${data.text}</div>`;
+            let textHtml = data.text ? `<div>${data.text}</div>` : '';
             
-            // クラウド上の写真URLがあればimgタグを追加する
-            if (data.cloudUrl) {
-                innerContent += `<img class="chat-img" src="${data.cloudUrl}" alt="送信された写真">`;
+            let imgHtml = '';
+            if (data.cloudUrl && typeof data.cloudUrl === 'string' && data.cloudUrl.startsWith('http')) {
+                imgHtml = `<img class="chat-img" src="${data.cloudUrl}">`;
+            }
+
+            const msgBox = document.createElement("div");
+            msgBox.className = "msg-box";
+            msgBox.innerHTML = `${textHtml}${imgHtml}`;
+            
+            if (data.name === myName) {
+                msgBox.title = "クリックして送信取り消し";
+                msgBox.onclick = () => deleteMessage(data.msgId);
             }
 
             container.innerHTML = `
                 <img class="chat-icon" src="${data.icon || defaultIcon}">
                 <div>
                     <div class="msg-name">${data.name}</div>
-                    <div class="msg-box">${innerContent}</div>
                 </div>
             `;
+            
+            container.querySelector("div").appendChild(msgBox);
             area.appendChild(container);
         });
         area.scrollTop = area.scrollHeight;
@@ -271,7 +335,29 @@
 
     function renderHistoryList(rooms) {
         const listDiv = document.getElementById("history-list"); listDiv.innerHTML = "";
-        rooms.forEach(r => { const item = document.createElement("div"); item.className = "history-item"; item.textContent = "部屋: " + r; item.onclick = () => { document.getElementById("room-input").value = r; joinRoom(r); }; listDiv.appendChild(item); });
+        rooms.forEach(r => { 
+            const item = document.createElement("div"); 
+            item.className = "history-item"; 
+            
+            // 部屋に入るためのクリックエリア
+            const clickArea = document.createElement("div");
+            clickArea.className = "room-click-area";
+            clickArea.textContent = "部屋: " + r;
+            clickArea.onclick = () => { document.getElementById("room-input").value = r; joinRoom(r); };
+            
+            // ロビー一覧の右側にゴミ箱ボタンを配置
+            const delBtn = document.createElement("button");
+            delBtn.className = "delete-room-btn";
+            delBtn.textContent = "削除";
+            delBtn.onclick = (e) => {
+                e.stopPropagation(); // 部屋入室イベントの発火を防ぐ
+                deleteRoomEntirely(r);
+            };
+
+            item.appendChild(clickArea);
+            item.appendChild(delBtn);
+            listDiv.appendChild(item); 
+        });
     }
 
     function joinRoom(room) {
@@ -283,15 +369,12 @@
         client.subscribe("room_history/" + room, () => {
             document.getElementById("login-screen").classList.add("hidden");
             document.getElementById("chat-screen").classList.remove("hidden");
-            if (window.history.state !== "chat") {
-                window.history.pushState("chat", null, "");
-            }
+            if (window.history.state !== "chat") { window.history.pushState("chat", null, ""); }
         });
     }
 
     document.getElementById("join-btn").onclick = () => joinRoom(document.getElementById("room-input").value);
     
-    // 🌟 【修正】写真送信時に即時描画せず、MQTT経由のクラウド更新に一本化する
     document.getElementById("send-btn").onclick = async () => {
         const name = document.getElementById("name-input").value;
         const icon = currentIconData || defaultIcon;
@@ -302,14 +385,15 @@
             cloudUrl = await uploadWithProgress(file);
         }
         
-        const msg = { name, icon, text: document.getElementById("msg-input").value, cloudUrl };
+        const randomStr = Math.random().toString(36).substring(2, 11);
+        const msgId = `${currentRoom}-${randomStr}_${Date.now()}`;
+        
+        const msg = { msgId, name, icon, text: document.getElementById("msg-input").value, cloudUrl };
         if(!msg.text && !msg.cloudUrl) return;
         
-        // 履歴を更新してサーバー(MQTT)へ送信（受信イベント側で renderMessages が走るよ）
         chatHistory = [...chatHistory, msg].slice(-30);
-        client.publish("room_history/" + currentRoom, JSON.stringify(chatHistory), {retain: true, qos: 0});
+        client.publish("room_history/" + currentRoom, JSON.stringify(chatHistory), {retain: true});
         
-        // 入力欄を綺麗にする
         document.getElementById("msg-input").value = "";
         document.getElementById("msg-file").value = "";
         document.getElementById("file-name").textContent = "";
