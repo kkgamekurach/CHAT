@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>LINE風チャット (部屋消去＆送信取り消し機能付き)</title>
+    <title>LINE風チャット (完全消去対応版)</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
         :root { --bg-color: #f0f2f5; --app-bg: #ffffff; --text-color: #000000; --msg-bg: #ffffff; }
@@ -184,10 +184,15 @@
         if(name && topic === "user_rooms/" + name) { try { myRooms = JSON.parse(message.toString()); renderHistoryList(myRooms); } catch(e) {} }
         if(currentRoom && topic === "room_history/" + currentRoom) { 
             try { 
-                chatHistory = JSON.parse(message.toString()); 
+                const strData = message.toString();
+                // 🌟 文字列が空っぽ、または空配列の文字列だったら履歴をクリア
+                if (!strData || strData === "[]") {
+                    chatHistory = [];
+                } else {
+                    chatHistory = JSON.parse(strData); 
+                }
                 renderMessages(); 
             } catch(e) {
-                // メッセージデータが空（削除された）場合
                 chatHistory = [];
                 renderMessages();
             } 
@@ -239,6 +244,7 @@
         document.getElementById("end-call-btn").classList.add("hidden");
     }
 
+    // 🌟 送信取り消し関数（サーバーのデータをしっかり上書き）
     function deleteMessage(msgId) {
         const myName = document.getElementById("name-input").value;
         const msgIndex = chatHistory.findIndex(m => m.msgId === msgId);
@@ -251,12 +257,13 @@
             
             if (confirm("このメッセージの送信を取り消しますか？")) {
                 chatHistory.splice(msgIndex, 1);
+                // 配列をJSON文字列にして確実に同期する（最後のメッセージだった場合は"[]"を送る）
                 client.publish("room_history/" + currentRoom, JSON.stringify(chatHistory), {retain: true});
             }
         }
     }
 
-    // 🌟 【追加】部屋とクラウド上のメッセージ履歴を完全に消す関数（2段階確認）
+    // 🌟 部屋を完全に消去する関数（空の配列を送ってMQTTサーバーに残る古いデータを抹消）
     function deleteRoomEntirely(roomName) {
         const name = document.getElementById("name-input").value;
         if (!name) return;
@@ -266,16 +273,15 @@
             // 2回目確認
             if (confirm("🚨 本当に削除してよろしいですか？サーバーからすべてのMSGIDデータが消去され、元に戻せません！")) {
                 
-                // 1. クラウド(MQTTサーバー)の保持データを空データにして上書き消去
-                client.publish("room_history/" + roomName, "", {retain: true});
+                // 🌟 ポイント：ただの空文字ではなく、明示的に空の配列「[]」を送信してretainキャッシュを上書き抹消！
+                client.publish("room_history/" + roomName, "[]", {retain: true});
                 
-                // 2. 自分の部屋リストから除外
+                // 自分の部屋リストから除外
                 myRooms = myRooms.filter(r => r !== roomName);
                 client.publish("user_rooms/" + name, JSON.stringify(myRooms), {retain: true});
                 
                 alert(`部屋「${roomName}」の全データを消去しました。`);
                 
-                // もし今開いている部屋だったらロビーに戻す
                 if (currentRoom === roomName) {
                     goBack();
                 } else {
@@ -285,7 +291,6 @@
         }
     }
 
-    // チャット画面内の「部屋削除」ボタンイベント紐付け
     document.getElementById("delete-this-room-btn").onclick = () => {
         if (currentRoom) deleteRoomEntirely(currentRoom);
     };
@@ -339,18 +344,16 @@
             const item = document.createElement("div"); 
             item.className = "history-item"; 
             
-            // 部屋に入るためのクリックエリア
             const clickArea = document.createElement("div");
             clickArea.className = "room-click-area";
             clickArea.textContent = "部屋: " + r;
             clickArea.onclick = () => { document.getElementById("room-input").value = r; joinRoom(r); };
             
-            // ロビー一覧の右側にゴミ箱ボタンを配置
             const delBtn = document.createElement("button");
             delBtn.className = "delete-room-btn";
             delBtn.textContent = "削除";
             delBtn.onclick = (e) => {
-                e.stopPropagation(); // 部屋入室イベントの発火を防ぐ
+                e.stopPropagation(); 
                 deleteRoomEntirely(r);
             };
 
