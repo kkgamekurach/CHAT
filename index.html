@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>LINE風チャット (完全消去対応版)</title>
+    <title>Chatish</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
         :root { --bg-color: #f0f2f5; --app-bg: #ffffff; --text-color: #000000; --msg-bg: #ffffff; }
@@ -181,11 +181,16 @@
     client.on('message', async (topic, message) => {
         const name = document.getElementById("name-input").value;
         if(name && topic === "user_profile/" + name) { currentIconData = message.toString(); document.getElementById("icon-preview").src = currentIconData || defaultIcon; document.getElementById("icon-preview").style.display = "block"; }
-        if(name && topic === "user_rooms/" + name) { try { myRooms = JSON.parse(message.toString()); renderHistoryList(myRooms); } catch(e) {} }
+        if(name && topic === "user_rooms/" + name) { 
+            try { 
+                const roomData = message.toString();
+                myRooms = roomData ? JSON.parse(roomData) : []; 
+                renderHistoryList(myRooms); 
+            } catch(e) { myRooms = []; renderHistoryList(myRooms); } 
+        }
         if(currentRoom && topic === "room_history/" + currentRoom) { 
             try { 
                 const strData = message.toString();
-                // 🌟 文字列が空っぽ、または空配列の文字列だったら履歴をクリア
                 if (!strData || strData === "[]") {
                     chatHistory = [];
                 } else {
@@ -244,7 +249,6 @@
         document.getElementById("end-call-btn").classList.add("hidden");
     }
 
-    // 🌟 送信取り消し関数（サーバーのデータをしっかり上書き）
     function deleteMessage(msgId) {
         const myName = document.getElementById("name-input").value;
         const msgIndex = chatHistory.findIndex(m => m.msgId === msgId);
@@ -257,35 +261,33 @@
             
             if (confirm("このメッセージの送信を取り消しますか？")) {
                 chatHistory.splice(msgIndex, 1);
-                // 配列をJSON文字列にして確実に同期する（最後のメッセージだった場合は"[]"を送る）
                 client.publish("room_history/" + currentRoom, JSON.stringify(chatHistory), {retain: true});
             }
         }
     }
 
-    // 🌟 部屋を完全に消去する関数（空の配列を送ってMQTTサーバーに残る古いデータを抹消）
+    // 🌟 部屋を完全に消去する関数（自分のリストからも確実に削除してサーバーに反映）
     function deleteRoomEntirely(roomName) {
         const name = document.getElementById("name-input").value;
         if (!name) return;
 
-        // 1回目確認
         if (confirm(`⚠️ 本当に部屋「${roomName}」とすべてのチャット履歴を削除しますか？`)) {
-            // 2回目確認
             if (confirm("🚨 本当に削除してよろしいですか？サーバーからすべてのMSGIDデータが消去され、元に戻せません！")) {
                 
-                // 🌟 ポイント：ただの空文字ではなく、明示的に空の配列「[]」を送信してretainキャッシュを上書き抹消！
+                // 1. チャット履歴を空っぽにする
                 client.publish("room_history/" + roomName, "[]", {retain: true});
                 
-                // 自分の部屋リストから除外
+                // 2. 自分の部屋リストから除外して、サーバーの自分用ルームリストも上書き保存！
                 myRooms = myRooms.filter(r => r !== roomName);
                 client.publish("user_rooms/" + name, JSON.stringify(myRooms), {retain: true});
                 
+                // 3. 画面のリストもすぐ更新
+                renderHistoryList(myRooms);
+
                 alert(`部屋「${roomName}」の全データを消去しました。`);
                 
                 if (currentRoom === roomName) {
                     goBack();
-                } else {
-                    renderHistoryList(myRooms);
                 }
             }
         }
