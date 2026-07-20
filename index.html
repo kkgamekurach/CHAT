@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Chatish</title>
+    <link rel="icon" href="favicon.png">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
         :root { --bg-color: #f0f2f5; --app-bg: #ffffff; --text-color: #000000; --msg-bg: #ffffff; }
@@ -46,7 +47,10 @@
 
 <div id="app">
     <div id="login-screen" class="screen">
-        <h2>LINE風チャット</h2>
+        <h2 style="display:flex; align-items:center; gap:8px;">
+            <img src="https://cdn-icons-png.flaticon.com/512/1041/1041916.png" style="width:28px; height:28px;">
+            Chatish
+        </h2>
         <input type="text" id="name-input" placeholder="名前を入力">
         <div class="input-group">
             <label>👤 アイコン画像</label>
@@ -266,7 +270,6 @@
         }
     }
 
-    // 🌟 部屋を完全に消去する関数（自分のリストからも確実に削除してサーバーに反映）
     function deleteRoomEntirely(roomName) {
         const name = document.getElementById("name-input").value;
         if (!name) return;
@@ -274,14 +277,11 @@
         if (confirm(`⚠️ 本当に部屋「${roomName}」とすべてのチャット履歴を削除しますか？`)) {
             if (confirm("🚨 本当に削除してよろしいですか？サーバーからすべてのMSGIDデータが消去され、元に戻せません！")) {
                 
-                // 1. チャット履歴を空っぽにする
                 client.publish("room_history/" + roomName, "[]", {retain: true});
                 
-                // 2. 自分の部屋リストから除外して、サーバーの自分用ルームリストも上書き保存！
                 myRooms = myRooms.filter(r => r !== roomName);
                 client.publish("user_rooms/" + name, JSON.stringify(myRooms), {retain: true});
                 
-                // 3. 画面のリストもすぐ更新
                 renderHistoryList(myRooms);
 
                 alert(`部屋「${roomName}」の全データを消去しました。`);
