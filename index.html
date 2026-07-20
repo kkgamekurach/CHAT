@@ -48,7 +48,7 @@
 <div id="app">
     <div id="login-screen" class="screen">
         <h2 style="display:flex; align-items:center; gap:8px;">
-            <img src="https://cdn-icons-png.flaticon.com/512/1041/1041916.png" style="width:28px; height:28px;">
+            <img src="./favicon.png" style="width:28px; height:28px;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1041/1041916.png'">
             Chatish
         </h2>
         <input type="text" id="name-input" placeholder="名前を入力">
@@ -111,6 +111,23 @@
     let localStream = null, peerConnection = null;
     let myCallId = Math.random().toString(36).substring(2, 11);
     const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    let deleteRequests = {};
+
+    function requestNotificationPermission() {
+        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+            Notification.requestPermission();
+        }
+    }
+
+    // 🔔 指定の文面に合わせた通知処理
+    function sendNotification(room, senderName, text) {
+        if ("Notification" in window && Notification.permission === "granted") {
+            const bodyText = text ? text : "写真";
+            new Notification(`${room}の${senderName}さんから「${bodyText}」と届きました`, {
+                icon: "./favicon.png"
+            });
+        }
+    }
 
     function goBack() {
         closeCall();
@@ -192,13 +209,22 @@
                 renderHistoryList(myRooms); 
             } catch(e) { myRooms = []; renderHistoryList(myRooms); } 
         }
+        
         if(currentRoom && topic === "room_history/" + currentRoom) { 
             try { 
                 const strData = message.toString();
                 if (!strData || strData === "[]") {
                     chatHistory = [];
                 } else {
-                    chatHistory = JSON.parse(strData); 
+                    const newHistory = JSON.parse(strData);
+                    
+                    if (newHistory.length > chatHistory.length) {
+                        const lastMsg = newHistory[newHistory.length - 1];
+                        if (lastMsg.name !== name) {
+                            sendNotification(currentRoom, lastMsg.name, lastMsg.text);
+                        }
+                    }
+                    chatHistory = newHistory; 
                 }
                 renderMessages(); 
             } catch(e) {
@@ -206,6 +232,25 @@
                 renderMessages();
             } 
         }
+
+        if(currentRoom && topic === "room_delete_req/" + currentRoom) {
+            try {
+                const reqs = JSON.parse(message.toString());
+                deleteRequests = reqs;
+                
+                const usersInRoom = [...new Set(chatHistory.map(m => m.name))];
+                
+                if (usersInRoom.length > 0 && usersInRoom.every(u => deleteRequests[u] === true)) {
+                    client.publish("room_history/" + currentRoom, "[]", {retain: true});
+                    client.publish("room_delete_req/" + currentRoom, "{}", {retain: true});
+                    chatHistory = [];
+                    renderMessages();
+                    alert("🤝 全員の同意が確認されたため、部屋とメッセージ履歴が完全削除されました。");
+                    goBack();
+                }
+            } catch(e) {}
+        }
+
         if(currentRoom && topic === "room_call/" + currentRoom) {
             const data = JSON.parse(message.toString());
             if (data.sender === myCallId) return;
@@ -266,6 +311,7 @@
             if (confirm("このメッセージの送信を取り消しますか？")) {
                 chatHistory.splice(msgIndex, 1);
                 client.publish("room_history/" + currentRoom, JSON.stringify(chatHistory), {retain: true});
+                renderMessages();
             }
         }
     }
@@ -274,21 +320,18 @@
         const name = document.getElementById("name-input").value;
         if (!name) return;
 
-        if (confirm(`⚠️ 本当に部屋「${roomName}」とすべてのチャット履歴を削除しますか？`)) {
-            if (confirm("🚨 本当に削除してよろしいですか？サーバーからすべてのMSGIDデータが消去され、元に戻せません！")) {
-                
-                client.publish("room_history/" + roomName, "[]", {retain: true});
-                
-                myRooms = myRooms.filter(r => r !== roomName);
-                client.publish("user_rooms/" + name, JSON.stringify(myRooms), {retain: true});
-                
-                renderHistoryList(myRooms);
+        if (confirm(`⚠️ 部屋「${roomName}」の削除をリクエストしますか？\n（相手も削除をOKすると完全削除されます）`)) {
+            myRooms = myRooms.filter(r => r !== roomName);
+            client.publish("user_rooms/" + name, JSON.stringify(myRooms), {retain: true});
+            renderHistoryList(myRooms);
 
-                alert(`部屋「${roomName}」の全データを消去しました。`);
-                
-                if (currentRoom === roomName) {
-                    goBack();
-                }
+            deleteRequests[name] = true;
+            client.publish("room_delete_req/" + roomName, JSON.stringify(deleteRequests), {retain: true});
+
+            alert(`部屋「${roomName}」の削除リクエストを出しました。相手も削除を同意するとデータが完全に消去されます。`);
+            
+            if (currentRoom === roomName) {
+                goBack();
             }
         }
     }
@@ -368,9 +411,14 @@
     function joinRoom(room) {
         const name = document.getElementById("name-input").value;
         if(!room || !name) return alert("名前と部屋IDを入れてね！");
+        
+        requestNotificationPermission();
+
         if (!myRooms.includes(room)) { myRooms.push(room); client.publish("user_rooms/" + name, JSON.stringify(myRooms), {retain: true}); }
         currentRoom = room; document.getElementById("room-title").textContent = "部屋: " + room;
+        
         client.subscribe("room_call/" + room);
+        client.subscribe("room_delete_req/" + room);
         client.subscribe("room_history/" + room, () => {
             document.getElementById("login-screen").classList.add("hidden");
             document.getElementById("chat-screen").classList.remove("hidden");
