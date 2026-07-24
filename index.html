@@ -1,563 +1,582 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chatish</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      margin: 20px;
-      background-color: #f8f9fa;
-    }
-    .card {
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      max-width: 440px;
-      margin: 0 auto;
-    }
-    .input-group {
-      margin-bottom: 12px;
-    }
-    .input-group label {
-      display: block;
-      font-size: 12px;
-      color: #666;
-      margin-bottom: 4px;
-    }
-    input, select {
-      width: 100%;
-      padding: 8px;
-      box-sizing: border-box;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      width: 100%;
-      padding: 10px;
-      border: none;
-      border-radius: 4px;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    .btn-primary { background-color: #007bff; }
-    .btn-secondary { background-color: #6c757d; }
-    .btn-success { background-color: #28a745; }
-    .btn-warning { background-color: #ffc107; color: #212529; }
+    <meta charset="UTF-8">
+    <title>Chatish</title>
+    <link rel="icon" type="image/png" href="./favicon.png">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+        :root { --bg-color: #f0f2f5; --app-bg: #ffffff; --text-color: #000000; --msg-bg: #ffffff; }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg-color: #18191a; --app-bg: #242526; --text-color: #e4e6eb; --msg-bg: #3a3b3c; }
+        }
+        body { background: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #app { width: 100%; max-width: 450px; height: 100vh; background: var(--app-bg); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .screen { flex: 1; padding: 20px; display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
+        .hidden { display: none !important; }
+        input[type="text"], input[type="password"] { padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; width: 100%; background: inherit; color: inherit; }
+        button { padding: 10px; margin: 5px 0; border-radius: 8px; border: none; background: #007bff; color: white; cursor: pointer; font-weight: bold; width: 100%; }
+        .input-group { border: 1px dashed #ccc; padding: 10px; border-radius: 8px; margin: 5px 0; background: rgba(0,0,0,0.02); }
+        .input-group label { font-size: 12px; font-weight: bold; display: block; margin-bottom: 5px; }
+        .checkbox-group { display: flex; align-items: center; margin: 8px 0; font-size: 13px; gap: 8px; }
+        .checkbox-group input { width: auto; margin: 0; }
+        .history-section { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px; flex: 1; }
+        .history-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: rgba(0,0,0,0.05); margin-bottom: 8px; border-radius: 10px; }
+        .room-click-area { flex: 1; display: flex; align-items: center; cursor: pointer; }
+        .chat-icon { width: 32px; height: 32px; border-radius: 50%; margin-right: 8px; object-fit: cover; background: #ccc; }
+        
+        #message-area { flex: 1; overflow-y: auto; padding: 10px; background: rgba(0,0,0,0.03); display: flex; flex-direction: column; margin-bottom: 125px; }
+        .msg-container { display: flex; align-items: flex-start; margin: 8px 0; }
+        .msg-box { background: var(--msg-bg); padding: 10px; border-radius: 12px; max-width: 70%; word-break: break-all; cursor: pointer; position: relative; }
+        .msg-box:hover { opacity: 0.9; }
+        .msg-name { font-size: 11px; color: #888; margin-bottom: 3px; }
+        .chat-img { width: 100%; max-width: 240px; border-radius: 8px; display: block; margin-top: 5px; }
+        .preview-circle { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; background: #ccc; margin: 5px 0; display: none; }
 
-    #chat-screen {
-      display: none;
-    }
-    .header-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      margin-bottom: 15px;
-      flex-wrap: wrap;
-    }
+        #progress-container { width: 100%; height: 6px; background: #ddd; border-radius: 3px; margin: 5px 0; display: none; }
+        #progress-bar { width: 0%; height: 100%; background: #28a745; border-radius: 3px; transition: width 0.1s; }
 
-    /* アイコン選択エリア */
-    .icon-picker-container {
-      border: 1px solid #eee;
-      padding: 10px;
-      border-radius: 6px;
-      background: #fafafa;
-    }
-    .icon-selector {
-      display: flex;
-      gap: 8px;
-      margin-top: 4px;
-      flex-wrap: wrap;
-    }
-    .icon-option {
-      font-size: 20px;
-      padding: 6px 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      cursor: pointer;
-      background: #ffffff;
-      user-select: none;
-    }
-    .icon-option.selected {
-      border-color: #007bff;
-      background: #e7f1ff;
-    }
+        #call-area { display: flex; flex-direction: column; background: #000; padding: 10px; border-radius: 10px; margin-bottom: 10px; position: relative; }
+        .video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .video-window { width: 100%; height: 120px; background: #222; border-radius: 8px; object-fit: cover; }
+        .call-status { color: #fff; font-size: 12px; text-align: center; margin-bottom: 5px; }
 
-    /* 画像プレビュー */
-    .avatar-preview {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 1px solid #ccc;
-      display: inline-block;
-      vertical-align: middle;
-    }
-
-    /* バックアップ管理エリア */
-    .backup-box {
-      background: #f1f3f5;
-      padding: 10px;
-      border-radius: 6px;
-      margin-top: 10px;
-      font-size: 12px;
-    }
-    .backup-buttons {
-      display: flex;
-      gap: 8px;
-      margin-top: 6px;
-    }
-
-    /* チャットメッセージ表示 */
-    .chat-box {
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      height: 260px;
-      padding: 10px;
-      overflow-y: auto;
-      background: #fafafa;
-      margin-bottom: 10px;
-    }
-    .msg-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-    .user-icon-box {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: #e7f1ff;
-      border: 1px solid #b8daff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      flex-shrink: 0;
-      overflow: hidden;
-    }
-    .user-icon-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .msg-content {
-      background: white;
-      padding: 6px 10px;
-      border-radius: 6px;
-      border: 1px solid #eee;
-      font-size: 14px;
-      word-break: break-all;
-    }
-    .msg-user {
-      font-size: 11px;
-      color: #888;
-      margin-bottom: 2px;
-    }
-  </style>
+        .bottom-send-area { position: absolute; bottom: 0; left: 0; width: 100%; background: var(--app-bg); padding: 10px 20px; border-top: 1px solid #ccc; display: flex; flex-direction: column; z-index: 10; }
+    </style>
 </head>
 <body>
 
-  <!-- ログイン画面 -->
-  <div id="login-screen" class="card">
-    <h2>Chatish ログイン</h2>
-    
-    <div class="input-group">
-      <label>ユーザー名</label>
-      <input type="text" id="name-input" placeholder="ユーザー名を入力">
-    </div>
-
-    <!-- アイコン設定（絵文字 または 画像ファイル） -->
-    <div class="input-group">
-      <label>アイコン設定</label>
-      <div class="icon-picker-container">
-        <!-- 1. 絵文字から選択 -->
-        <span style="font-size: 11px; color: #666;">絵文字から選択:</span>
-        <div class="icon-selector" id="icon-picker">
-          <div class="icon-option selected" data-icon="🐱">🐱</div>
-          <div class="icon-option" data-icon="🐶">🐶</div>
-          <div class="icon-option" data-icon="🦊">🦊</div>
-          <div class="icon-option" data-icon="🐼">🐼</div>
-          <div class="icon-option" data-icon="🤖">🤖</div>
-          <div class="icon-option" data-icon="🚀">🚀</div>
+<div id="app">
+    <!-- ログイン画面 -->
+    <div id="login-screen" class="screen">
+        <h2 style="display:flex; align-items:center; gap:8px; margin-bottom:15px;">
+            <img src="./favicon.png" style="width:28px; height:28px;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1041/1041916.png'">
+            Chatish
+        </h2>
+        <input type="text" id="name-input" placeholder="名前（ユーザー名）を入力">
+        <input type="password" id="user-pass-input" placeholder="ユーザーパスワード">
+        <input type="password" id="user-pass-confirm-input" placeholder="ユーザーパスワード（確認用）">
+        
+        <div class="input-group">
+            <label>👤 アイコン画像</label>
+            <input type="text" id="icon-input" placeholder="画像のURLを貼り付け">
+            <input type="file" id="icon-file" accept=".webp,.jpg,.jpeg,.png">
+            <img id="icon-preview" class="preview-circle">
         </div>
 
-        <!-- 2. カスタム画像ファイルを指定 -->
-        <div style="margin-top: 10px;">
-          <span style="font-size: 11px; color: #666;">画像ファイルを指定（優先適用）:</span>
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-            <input type="file" id="icon-file-input" accept="image/*" style="font-size: 12px;">
-            <button type="button" id="clear-image-btn" class="btn-secondary" style="width: auto; padding: 4px 8px; font-size: 10px;">クリア</button>
-          </div>
+        <input type="text" id="room-input" placeholder="部屋ID">
+        <input type="password" id="pass-input" placeholder="部屋のパスワード（任意）">
+        
+        <div class="checkbox-group">
+            <input type="checkbox" id="auto-login-check">
+            <label for="auto-login-check">次回から自動でこのアカウントと部屋にログインする</label>
         </div>
-      </div>
+
+        <button id="join-btn">作成して入室</button>
+        <button id="test-notif-btn" style="background:#17a2b8; margin-top:5px;">🔔 通知テスト</button>
+        <div class="history-section"><div id="history-list"></div></div>
     </div>
 
-    <div class="input-group">
-      <label>ユーザーパスワード</label>
-      <input type="password" id="user-pass-input" placeholder="パスワード（任意）">
+    <!-- チャット画面 -->
+    <div id="chat-screen" class="screen hidden">
+        <div style="display:flex; align-items:center; justify-content: space-between; border-bottom:1px solid #ccc; padding-bottom:8px; background: var(--app-bg); z-index: 10;">
+            <div style="display:flex; align-items:center; gap:4px;">
+                <button id="back-btn" style="background:#6c757d; margin:2px; width:auto; padding:6px 10px;">← 戻る</button>
+                <button id="auto-login-link-btn" style="background:#28a745; margin:2px; padding:6px 8px; font-size:11px; width:auto;">🔑 自動ログインリンク</button>
+                <span id="room-title" style="margin-left:5px; font-weight:bold; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">部屋: -</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px;">
+                <button id="share-link-btn" style="background:#17a2b8; margin:0; padding:8px 8px; font-size:12px; width:auto;">🔗 招待</button>
+                <button id="start-call-btn" style="background:#28a745; margin:0; padding:8px 8px; font-size:12px; width:auto;">📞 通話</button>
+                <button id="end-call-btn" style="background:#dc3545; margin:0; padding:8px 8px; font-size:12px; width:auto;" class="hidden">❌ 切断</button>
+                <button id="delete-this-room-btn" style="background:#dc3545; margin:0; padding:8px 8px; font-size:12px; width:auto;">🗑️ 削除</button>
+            </div>
+        </div>
+
+        <div id="call-area" class="hidden">
+            <div id="call-status" class="call-status">通話待機中...</div>
+            <div class="video-grid">
+                <div><div style="color:#fff; font-size:10px;">あなた</div><video id="local-video" class="video-window" autoplay muted playsinline></video></div>
+                <div><div style="color:#fff; font-size:10px;">相手</div><video id="remote-video" class="video-window" autoplay playsinline></video></div>
+            </div>
+        </div>
+        
+        <div id="message-area"></div>
+        
+        <div class="bottom-send-area">
+            <div id="progress-container"><div id="progress-bar"></div></div>
+            <div style="display:flex; align-items:center;">
+                <input type="text" id="msg-input" placeholder="メッセージ..." style="flex:1; margin:0;">
+                <button id="send-btn" style="width:auto; padding:10px 15px; margin-left:5px;">送信</button>
+            </div>
+            <div style="display:flex; align-items:center; margin-top:5px; font-size:12px; gap:10px;">
+                <label style="cursor:pointer; background:#17a2b8; color:white; padding:5px 10px; border-radius:5px; font-weight:bold;">
+                    📷 写真を選択
+                    <input type="file" id="msg-file" accept="image/*" style="display:none;">
+                </label>
+                <span id="file-name" style="color:#888; max-width: 130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+            </div>
+        </div>
     </div>
+</div>
 
-    <div class="input-group">
-      <label>確認用パスワード</label>
-      <input type="password" id="user-pass-confirm-input" placeholder="パスワード再入力">
-    </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+<script>
+    let client = mqtt.connect('wss://test.mosquitto.org:8081');
+    let currentRoom = "", chatHistory = [], myRooms = [], currentIconData = "";
+    const defaultIcon = "https://cdn-icons-png.flaticon.com/512/847/847969.png";
+    let localStream = null, peerConnection = null;
+    let myCallId = Math.random().toString(36).substring(2, 11);
+    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    let deleteRequests = {};
+    let roomPasswords = {};
+    let userPasswords = {};
 
-    <div class="input-group">
-      <label>部屋ID</label>
-      <input type="text" id="room-input" placeholder="部屋IDを入力">
-    </div>
-
-    <div class="input-group">
-      <label>部屋パスワード</label>
-      <input type="password" id="pass-input" placeholder="部屋パスワード（任意）">
-    </div>
-
-    <!-- ログイン用リンク生成ボタン -->
-    <button type="button" id="gen-login-link-btn" class="btn-secondary" style="margin-bottom: 8px;">
-      🔑 ログイン用のリンクを生成
-    </button>
-
-    <!-- 入室ボタン -->
-    <button type="button" id="join-btn" class="btn-primary">作成して入室</button>
-  </div>
-
-  <!-- チャット画面 -->
-  <div id="chat-screen" class="card">
-    <div class="header-bar">
-      <button id="back-btn" class="btn-secondary" style="width: auto; padding: 6px 10px;">← 戻る</button>
-      
-      <!-- 通知許可ボタン -->
-      <button id="notify-perm-btn" class="btn-warning" style="width: auto; padding: 6px 8px; font-size: 11px;">
-        🔔 通知を有効化
-      </button>
-
-      <button id="room-login-link-btn" class="btn-success" style="width: auto; padding: 6px 8px; font-size: 11px;">
-        🔑 部屋ログインリンク
-      </button>
-    </div>
-    
-    <h3 id="room-title">部屋: -</h3>
-
-    <!-- チャットログ表示エリア -->
-    <div class="chat-box" id="chat-box"></div>
-
-    <!-- メッセージ入力エリア -->
-    <div style="display: flex; gap: 6px; margin-bottom: 12px;">
-      <input type="text" id="msg-input" placeholder="メッセージを入力...">
-      <button id="send-btn" class="btn-primary" style="width: 80px;">送信</button>
-    </div>
-
-    <!-- バックアップ機能 -->
-    <div class="backup-box">
-      <strong>📁 チャットバックアップ管理</strong>
-      <div class="backup-buttons">
-        <button id="export-btn" class="btn-warning" style="padding: 6px; font-size: 11px;">💾 ファイルへ保存</button>
-        <button id="import-btn" class="btn-secondary" style="padding: 6px; font-size: 11px;">📂 ファイルから復元</button>
-      </div>
-      <input type="file" id="import-file-input" accept=".json" style="display: none;">
-    </div>
-  </div>
-
-  <script>
     function encodeData(str) {
-      return btoa(encodeURIComponent(str));
+        try { return btoa(encodeURIComponent(str)); } catch(e) { return ""; }
     }
+
     function decodeData(str) {
-      try {
-        return decodeURIComponent(atob(str));
-      } catch (e) {
-        return str;
-      }
+        try { return decodeURIComponent(atob(str)); } catch(e) { return ""; }
     }
 
-    let currentRoom = "";
-    let selectedIconEmoji = "🐱"; 
-    let customImageData = ""; // 画像データ（DataURL）
-    let chatLogData = []; 
-
-    // 絵文字アイコン選択のイベント
-    document.querySelectorAll(".icon-option").forEach(elem => {
-      elem.onclick = () => {
-        document.querySelectorAll(".icon-option").forEach(e => e.classList.remove("selected"));
-        elem.classList.add("selected");
-        selectedIconEmoji = elem.getAttribute("data-icon");
-      };
-    });
-
-    // カスタム画像ファイルの読み込み
-    document.getElementById("icon-file-input").addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          customImageData = event.target.result;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    // 画像クリアボタン
-    document.getElementById("clear-image-btn").onclick = () => {
-      document.getElementById("icon-file-input").value = "";
-      customImageData = "";
-    };
-
-    // 通知許可のリクエスト
-    document.getElementById("notify-perm-btn").onclick = () => {
-      if ("Notification" in window) {
-        Notification.requestPermission().then(permission => {
-          if (permission === "granted") {
-            alert("🔔 通知機能が有効になったよ！");
-          } else {
-            alert("通知が拒否されたか、有効にできませんでした。");
-          }
-        });
-      } else {
-        alert("お使いのブラウザは通知機能に対応していません。");
-      }
-    };
-
-    // デバイスへの通知発行処理
-    function sendNotification(title, body) {
-      if ("Notification" in window && Notification.permission === "granted") {
-        if (document.hidden) { // 画面が開かれていない時のみ通知
-          new Notification(title, { body: body, icon: customImageData || null });
-        }
-      }
-    }
-
-    // 入室処理
-    function joinRoom(roomId) {
-      const name = document.getElementById("name-input").value.trim();
-      const pass = document.getElementById("user-pass-input").value;
-      const confirmPass = document.getElementById("user-pass-confirm-input").value;
-
-      if (!name) {
-        alert("ユーザー名を入力してね！");
-        return;
-      }
-
-      if (pass !== confirmPass) {
-        alert("ユーザーパスワードが一致していません！");
-        return;
-      }
-
-      currentRoom = roomId;
-      document.getElementById("room-title").textContent = `部屋: ${currentRoom}`;
-      document.getElementById("login-screen").style.display = "none";
-      document.getElementById("chat-screen").style.display = "block";
-
-      if (chatLogData.length === 0) {
-        addMessage("システム", { emoji: "📢", img: "" }, `${name} さんが入室しました！`);
-      }
-    }
-
-    // チャットメッセージ描画
-    function addMessage(user, iconObj, text, save = true) {
-      const box = document.getElementById("chat-box");
-      const msgDiv = document.createElement("div");
-      msgDiv.className = "msg-item";
-
-      // 画像があれば画像表示、なければ絵文字表示
-      let iconHtml = "";
-      if (iconObj && iconObj.img) {
-        iconHtml = `<img src="${iconObj.img}" class="user-icon-img">`;
-      } else {
-        iconHtml = iconObj ? (iconObj.emoji || '👤') : '👤';
-      }
-
-      msgDiv.innerHTML = `
-        <div class="user-icon-box">${iconHtml}</div>
-        <div>
-          <div class="msg-user">${user}</div>
-          <div class="msg-content">${text}</div>
-        </div>
-      `;
-      box.appendChild(msgDiv);
-      box.scrollTop = box.scrollHeight;
-
-      if (save) {
-        chatLogData.push({ user, icon: iconObj, text, timestamp: new Date().toISOString() });
-      }
-
-      // 通知を発行
-      sendNotification(`${user} (@${currentRoom})`, text);
-    }
-
-    // メッセージ送信
-    document.getElementById("send-btn").onclick = () => {
-      const input = document.getElementById("msg-input");
-      const text = input.value.trim();
-      const name = document.getElementById("name-input").value;
-      if (!text) return;
-      
-      const iconObj = {
-        emoji: selectedIconEmoji,
-        img: customImageData
-      };
-
-      addMessage(name, iconObj, text);
-      input.value = "";
-    };
-
-    // 作成して入室
-    document.getElementById("join-btn").onclick = () => {
-      const roomId = document.getElementById("room-input").value.trim();
-      if (!roomId) {
-        alert("部屋IDを入力してね！");
-        return;
-      }
-      joinRoom(roomId);
-    };
-
-    // ログイン用リンク生成
-    document.getElementById("gen-login-link-btn").onclick = () => {
-      const name = document.getElementById("name-input").value.trim();
-      const userPass = document.getElementById("user-pass-input").value;
-
-      if (!name) {
-        return alert("ユーザー名を入力してからリンクを生成してね！");
-      }
-
-      const baseUrl = window.location.href.split('?')[0];
-      let linkUrl = `${baseUrl}?u=${encodeURIComponent(encodeData(name))}&ico=${encodeURIComponent(encodeData(selectedIconEmoji))}`;
-      if (customImageData) {
-        linkUrl += `&img=${encodeURIComponent(encodeData(customImageData))}`;
-      }
-      if (userPass) {
-        linkUrl += `&up=${encodeURIComponent(encodeData(userPass))}`;
-      }
-
-      navigator.clipboard.writeText(linkUrl).then(() => {
-        alert(`🔑 ログイン用のリンクをコピーしたよ！\n\n${linkUrl}`);
-      }).catch(() => {
-        prompt("以下のリンクをコピーしてね：", linkUrl);
-      });
-    };
-
-    // 部屋用ログインリンク生成
-    document.getElementById("room-login-link-btn").onclick = () => {
-      if (!currentRoom) return;
-      const name = document.getElementById("name-input").value;
-      const userPass = document.getElementById("user-pass-input").value;
-      const roomPass = document.getElementById("pass-input").value;
-
-      const baseUrl = window.location.href.split('?')[0];
-      let linkUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}`;
-      
-      if (name) linkUrl += `&u=${encodeURIComponent(encodeData(name))}`;
-      if (selectedIconEmoji) linkUrl += `&ico=${encodeURIComponent(encodeData(selectedIconEmoji))}`;
-      if (customImageData) linkUrl += `&img=${encodeURIComponent(encodeData(customImageData))}`;
-      if (userPass) linkUrl += `&up=${encodeURIComponent(encodeData(userPass))}`;
-      if (roomPass) linkUrl += `&rp=${encodeURIComponent(encodeData(roomPass))}`;
-
-      navigator.clipboard.writeText(linkUrl).then(() => {
-        alert(`🔑 部屋「${currentRoom}」にログインするリンクをコピーしたよ！\n\n${linkUrl}`);
-      }).catch(() => {
-        prompt("以下のリンクをコピーしてね：", linkUrl);
-      });
-    };
-
-    // 💾 バックアップ保存
-    document.getElementById("export-btn").onclick = () => {
-      if (chatLogData.length === 0) {
-        alert("保存するチャット履歴がありません！");
-        return;
-      }
-
-      const backupData = {
-        room: currentRoom,
-        user: document.getElementById("name-input").value,
-        messages: chatLogData,
-        exportedAt: new Date().toLocaleString()
-      };
-
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
-      const downloadAnchor = document.createElement("a");
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `chatish_backup_${currentRoom || 'data'}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-    };
-
-    // 📂 バックアップ復元
-    document.getElementById("import-btn").onclick = () => {
-      document.getElementById("import-file-input").click();
-    };
-
-    document.getElementById("import-file-input").addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const importedData = JSON.parse(event.target.result);
-          if (importedData.messages && Array.isArray(importedData.messages)) {
-            document.getElementById("chat-box").innerHTML = "";
-            chatLogData = [];
-
-            importedData.messages.forEach(msg => {
-              addMessage(msg.user, msg.icon, msg.text, true);
-            });
-
-            alert(`📂 バックアップを復元したよ！（${importedData.messages.length} 件）`);
-          } else {
-            alert("ファイル形式が正しくありません。");
-          }
-        } catch (err) {
-          alert("ファイルの読み込みに失敗しました。");
-        }
-      };
-      reader.readAsText(file);
-      e.target.value = "";
-    });
-
-    // 戻るボタン
-    document.getElementById("back-btn").onclick = () => {
-      document.getElementById("chat-screen").style.display = "none";
-      document.getElementById("login-screen").style.display = "block";
-      document.getElementById("chat-box").innerHTML = "";
-      chatLogData = [];
-      currentRoom = "";
-    };
-
-    // ページロード時のURLパラメータ処理
     window.addEventListener('DOMContentLoaded', () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const roomParam = urlParams.get('room');
-      const roomPassParam = urlParams.get('rp');
-      const userParam = urlParams.get('u');
-      const userPassParam = urlParams.get('up');
-      const iconParam = urlParams.get('ico');
-      const imgParam = urlParams.get('img');
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomParam = urlParams.get('room');
+        const roomPassParam = urlParams.get('rp');
+        const userParam = urlParams.get('u');
+        const userPassParam = urlParams.get('up');
 
-      if (userParam) document.getElementById("name-input").value = decodeData(userParam);
-      if (iconParam) selectedIconEmoji = decodeData(iconParam);
-      if (imgParam) customImageData = decodeData(imgParam);
+        if (userParam) document.getElementById("name-input").value = decodeData(userParam);
+        if (userPassParam) {
+            const upDecoded = decodeData(userPassParam);
+            document.getElementById("user-pass-input").value = upDecoded;
+            document.getElementById("user-pass-confirm-input").value = upDecoded;
+        }
+        if (roomParam) document.getElementById("room-input").value = roomParam;
+        if (roomPassParam) document.getElementById("pass-input").value = decodeData(roomPassParam);
 
-      if (userPassParam) {
-        const upDecoded = decodeData(userPassParam);
-        document.getElementById("user-pass-input").value = upDecoded;
-        document.getElementById("user-pass-confirm-input").value = upDecoded;
-      }
-      
-      if (roomParam) document.getElementById("room-input").value = roomParam;
-      if (roomPassParam) document.getElementById("pass-input").value = decodeData(roomPassParam);
+        if (!userParam && localStorage.getItem("chatish_auto") === "true") {
+            document.getElementById("name-input").value = localStorage.getItem("chatish_user") || "";
+            const savedUPass = localStorage.getItem("chatish_upass") || "";
+            document.getElementById("user-pass-input").value = savedUPass;
+            document.getElementById("user-pass-confirm-input").value = savedUPass;
+            document.getElementById("room-input").value = localStorage.getItem("chatish_room") || "";
+            document.getElementById("pass-input").value = localStorage.getItem("chatish_rpass") || "";
+            document.getElementById("auto-login-check").checked = true;
 
-      if (roomParam && userParam) {
-        setTimeout(() => { 
-          joinRoom(roomParam); 
-        }, 500);
-      }
+            setTimeout(() => {
+                const r = document.getElementById("room-input").value;
+                if (r && document.getElementById("name-input").value) {
+                    joinRoom(r);
+                }
+            }, 600);
+        }
+
+        if (userParam && roomParam) {
+            setTimeout(() => { joinRoom(roomParam); }, 600);
+        }
     });
-  </script>
+
+    document.getElementById("auto-login-link-btn").onclick = () => {
+        if (!currentRoom) return;
+        const name = document.getElementById("name-input").value;
+        const userPass = document.getElementById("user-pass-input").value;
+        const roomPass = document.getElementById("pass-input").value;
+
+        const baseUrl = window.location.href.split('?')[0];
+        let linkUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}`;
+        
+        if (name) linkUrl += `&u=${encodeURIComponent(encodeData(name))}`;
+        if (userPass) linkUrl += `&up=${encodeURIComponent(encodeData(userPass))}`;
+        if (roomPass) linkUrl += `&rp=${encodeURIComponent(encodeData(roomPass))}`;
+
+        navigator.clipboard.writeText(linkUrl).then(() => {
+            alert(`🔑 アカウント情報付き自動ログインリンクをコピーしました！`);
+        }).catch(() => {
+            prompt("以下のリンクをコピーしてください：", linkUrl);
+        });
+    };
+
+    function requestNotificationPermission() {
+        if ("Notification" in window) { Notification.requestPermission(); }
+    }
+
+    function sendNotification(room, senderName, text) {
+        if ("Notification" in window && Notification.permission === "granted") {
+            const bodyText = text ? text : "写真";
+            try { new Notification(`${room}の${senderName}さんから「${bodyText}」と届きました`, { icon: "./favicon.png" }); } catch(e) {}
+        }
+    }
+
+    document.getElementById("test-notif-btn").onclick = () => {
+        requestNotificationPermission();
+        const testRoom = document.getElementById("room-input").value || "テスト部屋";
+        const testName = document.getElementById("name-input").value || "テスト名前";
+        setTimeout(() => { sendNotification(testRoom, testName, "テストメッセージです"); }, 500);
+    };
+
+    function goBack() {
+        closeCall();
+        document.getElementById("chat-screen").classList.add("hidden");
+        document.getElementById("login-screen").classList.remove("hidden");
+        currentRoom = "";
+    }
+
+    document.getElementById("back-btn").onclick = () => goBack();
+    window.onpopstate = () => goBack();
+
+    document.getElementById("share-link-btn").onclick = () => {
+        if (!currentRoom) return;
+        const baseUrl = window.location.href.split('?')[0];
+        const shareUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}`;
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            alert(`🔗 部屋「${currentRoom}」の招待リンクをコピーしました！`);
+        }).catch(() => {
+            prompt("以下のリンクをコピーして共有してください：", shareUrl);
+        });
+    };
+
+    async function uploadWithProgress(file) {
+        const container = document.getElementById("progress-container");
+        const bar = document.getElementById("progress-bar");
+        container.style.display = "block";
+        bar.style.width = "0%";
+        return new Promise((resolve) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "https://tmpfiles.org/api/v1/upload");
+            xhr.upload.onprogress = (e) => { if (e.lengthComputable) bar.style.width = Math.round((e.loaded / e.total) * 100) + "%"; };
+            xhr.onload = () => { 
+                container.style.display = "none"; 
+                try { 
+                    const res = JSON.parse(xhr.responseText);
+                    if (res && res.data && res.data.url) {
+                        resolve(res.data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/"));
+                    } else { resolve(""); }
+                } catch(e) { resolve(""); } 
+            };
+            xhr.onerror = () => { container.style.display = "none"; resolve(""); };
+            const formData = new FormData(); formData.append("file", file); xhr.send(formData);
+        });
+    }
+
+    function compressImage(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width, height = img.height;
+                    if (width > 100) { height *= 100 / width; width = 100; }
+                    canvas.width = width; canvas.height = height;
+                    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.6));
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    document.getElementById("icon-file").onchange = async (e) => {
+        if(e.target.files.length > 0) {
+            currentIconData = await compressImage(e.target.files[0]);
+            document.getElementById("icon-preview").src = currentIconData;
+            document.getElementById("icon-preview").style.display = "block";
+        }
+    };
+
+    document.getElementById("msg-file").onchange = (e) => {
+        if(e.target.files.length > 0) document.getElementById("file-name").textContent = e.target.files[0].name;
+    };
+
+    document.getElementById("name-input").onblur = () => {
+        const name = document.getElementById("name-input").value;
+        if(name) {
+            client.subscribe("user_profile/" + name);
+            client.subscribe("user_rooms/" + name);
+            client.subscribe("user_pass/" + name);
+        }
+    };
+
+    client.on('message', async (topic, message) => {
+        const name = document.getElementById("name-input").value;
+        if(name && topic === "user_profile/" + name) { currentIconData = message.toString(); document.getElementById("icon-preview").src = currentIconData || defaultIcon; document.getElementById("icon-preview").style.display = "block"; }
+        if(name && topic === "user_rooms/" + name) { 
+            try { 
+                const roomData = message.toString();
+                myRooms = roomData ? JSON.parse(roomData) : []; 
+                renderHistoryList(myRooms); 
+            } catch(e) { myRooms = []; renderHistoryList(myRooms); } 
+        }
+
+        if (topic.startsWith("user_pass/")) {
+            const uName = topic.replace("user_pass/", "");
+            userPasswords[uName] = message.toString();
+        }
+
+        if (topic.startsWith("room_pass/")) {
+            const room = topic.replace("room_pass/", "");
+            roomPasswords[room] = message.toString();
+        }
+
+        if(currentRoom && topic === "room_history/" + currentRoom) { 
+            try { 
+                const strData = message.toString();
+                if (!strData || strData === "[]") {
+                    chatHistory = [];
+                } else {
+                    const newHistory = JSON.parse(strData);
+                    if (newHistory.length > chatHistory.length) {
+                        const lastMsg = newHistory[newHistory.length - 1];
+                        if (lastMsg.name !== name) {
+                            sendNotification(currentRoom, lastMsg.name, lastMsg.text);
+                        }
+                    }
+                    chatHistory = newHistory; 
+                }
+                renderMessages(); 
+            } catch(e) {
+                chatHistory = [];
+                renderMessages();
+            } 
+        }
+
+        if(currentRoom && topic === "room_delete_req/" + currentRoom) {
+            try {
+                const reqs = JSON.parse(message.toString());
+                deleteRequests = reqs;
+                const usersInRoom = [...new Set(chatHistory.map(m => m.name))];
+                if (usersInRoom.length > 0 && usersInRoom.every(u => deleteRequests[u] === true)) {
+                    client.publish("room_history/" + currentRoom, "[]", {retain: true});
+                    client.publish("room_delete_req/" + currentRoom, "{}", {retain: true});
+                    client.publish("room_pass/" + currentRoom, "", {retain: true});
+                    chatHistory = [];
+                    renderMessages();
+                    alert("🤝 全員の同意が確認されたため、部屋が完全削除されました。");
+                    goBack();
+                }
+            } catch(e) {}
+        }
+
+        // WebRTC 通話シグナリング処理
+        if(currentRoom && topic === "room_call/" + currentRoom) {
+            const data = JSON.parse(message.toString());
+            if (data.sender === myCallId) return;
+
+            if (data.type === "offer") {
+                if (!localStream && confirm("📞 着信！通話に出る？")) {
+                    await startCallFlow(false, data.offer);
+                }
+            } else if (data.type === "answer" && peerConnection) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            } else if (data.type === "candidate" && peerConnection) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            } else if (data.type === "bye") {
+                closeCall();
+            }
+        }
+    });
+
+    // 通話制御ロジック
+    async function startCallFlow(isCaller, offerData = null) {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById("local-video").srcObject = localStream;
+            document.getElementById("call-area").classList.remove("hidden");
+            document.getElementById("start-call-btn").classList.add("hidden");
+            document.getElementById("end-call-btn").classList.remove("hidden");
+            document.getElementById("call-status").textContent = "通話接続中...";
+
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.ontrack = (e) => {
+                document.getElementById("remote-video").srcObject = e.streams[0];
+                document.getElementById("call-status").textContent = "通話中";
+            };
+
+            peerConnection.onicecandidate = (e) => {
+                if (e.candidate) {
+                    client.publish("room_call/" + currentRoom, JSON.stringify({
+                        sender: myCallId,
+                        type: "candidate",
+                        candidate: e.candidate
+                    }));
+                }
+            };
+
+            if (isCaller) {
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                client.publish("room_call/" + currentRoom, JSON.stringify({
+                    sender: myCallId,
+                    type: "offer",
+                    offer: offer
+                }));
+            } else if (offerData) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offerData));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                client.publish("room_call/" + currentRoom, JSON.stringify({
+                    sender: myCallId,
+                    type: "answer",
+                    answer: answer
+                }));
+            }
+        } catch (e) {
+            alert("マイクやカメラへのアクセスに失敗しました。");
+            closeCall();
+        }
+    }
+
+    function closeCall() {
+        if (localStream) {
+            localStream.getTracks().forEach(t => t.stop());
+            localStream = null;
+        }
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+        document.getElementById("call-area").classList.add("hidden");
+        document.getElementById("start-call-btn").classList.remove("hidden");
+        document.getElementById("end-call-btn").classList.add("hidden");
+        document.getElementById("local-video").srcObject = null;
+        document.getElementById("remote-video").srcObject = null;
+    }
+
+    document.getElementById("start-call-btn").onclick = () => {
+        if (!currentRoom) return;
+        startCallFlow(true);
+    };
+
+    document.getElementById("end-call-btn").onclick = () => {
+        if (currentRoom) {
+            client.publish("room_call/" + currentRoom, JSON.stringify({ sender: myCallId, type: "bye" }));
+        }
+        closeCall();
+    };
+
+    // 入室・メッセージ処理
+    function joinRoom(room) {
+        const name = document.getElementById("name-input").value.trim();
+        if (!name || !room) {
+            alert("名前と部屋IDを入力してください！");
+            return;
+        }
+
+        if (currentRoom) {
+            client.unsubscribe("room_history/" + currentRoom);
+            client.unsubscribe("room_delete_req/" + currentRoom);
+            client.unsubscribe("room_call/" + currentRoom);
+        }
+
+        currentRoom = room;
+        document.getElementById("room-title").textContent = "部屋: " + room;
+        document.getElementById("login-screen").classList.add("hidden");
+        document.getElementById("chat-screen").classList.remove("hidden");
+
+        // 自動保存設定
+        if (document.getElementById("auto-login-check").checked) {
+            localStorage.setItem("chatish_auto", "true");
+            localStorage.setItem("chatish_user", name);
+            localStorage.setItem("chatish_upass", document.getElementById("user-pass-input").value);
+            localStorage.setItem("chatish_room", room);
+            localStorage.setItem("chatish_rpass", document.getElementById("pass-input").value);
+        }
+
+        client.subscribe("room_history/" + room);
+        client.subscribe("room_delete_req/" + room);
+        client.subscribe("room_call/" + room);
+
+        if (!myRooms.includes(room)) {
+            myRooms.push(room);
+            client.publish("user_rooms/" + name, JSON.stringify(myRooms), { retain: true });
+        }
+    }
+
+    document.getElementById("join-btn").onclick = () => {
+        const room = document.getElementById("room-input").value.trim();
+        joinRoom(room);
+    };
+
+    // メッセージ送信処理
+    async function sendMessage() {
+        const name = document.getElementById("name-input").value.trim();
+        const textInput = document.getElementById("msg-input");
+        const fileInput = document.getElementById("msg-file");
+        const text = textInput.value.trim();
+        
+        let imgUrl = "";
+        if (fileInput.files.length > 0) {
+            imgUrl = await uploadWithProgress(fileInput.files[0]);
+        }
+
+        if (!text && !imgUrl) return;
+
+        const newMsg = {
+            name: name,
+            icon: currentIconData || defaultIcon,
+            text: text,
+            img: imgUrl,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        chatHistory.push(newMsg);
+        client.publish("room_history/" + currentRoom, JSON.stringify(chatHistory), { retain: true });
+
+        textInput.value = "";
+        fileInput.value = "";
+        document.getElementById("file-name").textContent = "";
+    }
+
+    document.getElementById("send-btn").onclick = sendMessage;
+    document.getElementById("msg-input").onkeypress = (e) => {
+        if (e.key === "Enter") sendMessage();
+    };
+
+    function renderMessages() {
+        const area = document.getElementById("message-area");
+        area.innerHTML = "";
+        chatHistory.forEach(m => {
+            const container = document.createElement("div");
+            container.className = "msg-container";
+            
+            const img = document.createElement("img");
+            img.className = "chat-icon";
+            img.src = m.icon || defaultIcon;
+
+            const box = document.createElement("div");
+            box.className = "msg-box";
+            
+            let html = `<div class="msg-name">${m.name} (${m.time})</div>`;
+            if (m.text) html += `<div>${m.text}</div>`;
+            if (m.img) html += `<img src="${m.img}" class="chat-img">`;
+            box.innerHTML = html;
+
+            container.appendChild(img);
+            container.appendChild(box);
+            area.appendChild(container);
+        });
+        area.scrollTop = area.scrollHeight;
+    }
+
+    function renderHistoryList(rooms) {
+        const list = document.getElementById("history-list");
+        list.innerHTML = "";
+        rooms.forEach(r => {
+            const item = document.createElement("div");
+            item.className = "history-item";
+            item.innerHTML = `<div class="room-click-area">🚪 部屋: <b>${r}</b></div>`;
+            item.querySelector(".room-click-area").onclick = () => {
+                document.getElementById("room-input").value = r;
+                joinRoom(r);
+            };
+            list.appendChild(item);
+        });
+    }
+</script>
 </body>
 </html>
