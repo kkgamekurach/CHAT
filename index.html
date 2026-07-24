@@ -12,13 +12,15 @@
         }
         body { background: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; height: 100vh; }
         #app { width: 100%; max-width: 450px; height: 100vh; background: var(--app-bg); display: flex; flex-direction: column; overflow: hidden; position: relative; }
-        .screen { flex: 1; padding: 20px; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        .screen { flex: 1; padding: 20px; display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
         .hidden { display: none !important; }
         input[type="text"], input[type="password"] { padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; width: 100%; background: inherit; color: inherit; }
-        button { padding: 10px; margin: 5px; border-radius: 8px; border: none; background: #007bff; color: white; cursor: pointer; font-weight: bold; }
+        button { padding: 10px; margin: 5px 0; border-radius: 8px; border: none; background: #007bff; color: white; cursor: pointer; font-weight: bold; width: 100%; }
         .input-group { border: 1px dashed #ccc; padding: 10px; border-radius: 8px; margin: 5px 0; background: rgba(0,0,0,0.02); }
         .input-group label { font-size: 12px; font-weight: bold; display: block; margin-bottom: 5px; }
-        .history-section { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px; flex: 1; overflow-y: auto; }
+        .checkbox-group { display: flex; align-items: center; margin: 8px 0; font-size: 13px; gap: 8px; }
+        .checkbox-group input { width: auto; margin: 0; }
+        .history-section { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px; flex: 1; }
         .history-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: rgba(0,0,0,0.05); margin-bottom: 8px; border-radius: 10px; }
         .room-click-area { flex: 1; display: flex; align-items: center; cursor: pointer; }
         .chat-icon { width: 32px; height: 32px; border-radius: 50%; margin-right: 8px; object-fit: cover; background: #ccc; }
@@ -40,43 +42,56 @@
         .call-status { color: #fff; font-size: 12px; text-align: center; margin-bottom: 5px; }
 
         .bottom-send-area { position: absolute; bottom: 0; left: 0; width: 100%; background: var(--app-bg); padding: 10px 20px; border-top: 1px solid #ccc; display: flex; flex-direction: column; z-index: 10; }
-        .delete-room-btn { background: #dc3545; padding: 5px 10px; font-size: 12px; margin: 0; border-radius: 6px; }
+        .delete-room-btn { background: #dc3545; padding: 5px 10px; font-size: 12px; margin: 0; border-radius: 6px; width: auto; }
     </style>
 </head>
 <body>
 
 <div id="app">
+    <!-- ログイン画面 -->
     <div id="login-screen" class="screen">
-        <h2 style="display:flex; align-items:center; gap:8px;">
+        <h2 style="display:flex; align-items:center; gap:8px; margin-bottom:15px;">
             <img src="./favicon.png" style="width:28px; height:28px;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1041/1041916.png'">
             Chatish
         </h2>
-        <input type="text" id="name-input" placeholder="名前を入力">
+        <input type="text" id="name-input" placeholder="名前（ユーザー名）を入力">
         <input type="password" id="user-pass-input" placeholder="ユーザーパスワード">
+        <input type="password" id="user-pass-confirm-input" placeholder="ユーザーパスワード（確認用）">
+        
         <div class="input-group">
             <label>👤 アイコン画像</label>
             <input type="text" id="icon-input" placeholder="画像のURLを貼り付け">
             <input type="file" id="icon-file" accept=".webp,.jpg,.jpeg,.png">
             <img id="icon-preview" class="preview-circle">
         </div>
+
         <input type="text" id="room-input" placeholder="部屋ID">
         <input type="password" id="pass-input" placeholder="部屋のパスワード（任意）">
-        <button id="join-btn">入室</button>
+        
+        <!-- 自動ログイン・自動入室ボタン（チェックボックス） -->
+        <div class="checkbox-group">
+            <input type="checkbox" id="auto-login-check">
+            <label for="auto-login-check">次回から自動でこのアカウントと部屋にログインする</label>
+        </div>
+
+        <button id="join-btn">作成して入室</button>
         <button id="test-notif-btn" style="background:#17a2b8; margin-top:5px;">🔔 通知テスト</button>
         <div class="history-section"><div id="history-list"></div></div>
     </div>
 
+    <!-- チャット画面 -->
     <div id="chat-screen" class="screen hidden">
         <div style="display:flex; align-items:center; justify-content: space-between; border-bottom:1px solid #ccc; padding-bottom:8px; background: var(--app-bg); z-index: 10;">
-            <div style="display:flex; align-items:center;">
-                <button id="back-btn" style="background:#6c757d; margin:2px;">← 戻る</button>
-                <span id="room-title" style="margin-left:10px; font-weight:bold; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">部屋: -</span>
+            <div style="display:flex; align-items:center; gap:4px;">
+                <button id="back-btn" style="background:#6c757d; margin:2px; width:auto; padding:6px 10px;">← 戻る</button>
+                <button id="auto-login-link-btn" style="background:#28a745; margin:2px; padding:6px 8px; font-size:11px; width:auto;">🔑 自動ログインリンク</button>
+                <span id="room-title" style="margin-left:5px; font-weight:bold; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">部屋: -</span>
             </div>
             <div style="display:flex; align-items:center; gap:4px;">
-                <button id="share-link-btn" style="background:#17a2b8; margin:0; padding:8px 8px; font-size:12px;">🔗 招待リンク</button>
-                <button id="start-call-btn" style="background:#28a745; margin:0; padding:8px 8px; font-size:12px;">📞 通話</button>
-                <button id="end-call-btn" style="background:#dc3545; margin:0; padding:8px 8px; font-size:12px;" class="hidden">❌ 切断</button>
-                <button id="delete-this-room-btn" style="background:#dc3545; margin:0; padding:8px 8px; font-size:12px;">🗑️ 部屋削除</button>
+                <button id="share-link-btn" style="background:#17a2b8; margin:0; padding:8px 8px; font-size:12px; width:auto;">🔗 招待</button>
+                <button id="start-call-btn" style="background:#28a745; margin:0; padding:8px 8px; font-size:12px; width:auto;">📞 通話</button>
+                <button id="end-call-btn" style="background:#dc3545; margin:0; padding:8px 8px; font-size:12px; width:auto;" class="hidden">❌ 切断</button>
+                <button id="delete-this-room-btn" style="background:#dc3545; margin:0; padding:8px 8px; font-size:12px; width:auto;">🗑️ 削除</button>
             </div>
         </div>
 
@@ -94,7 +109,7 @@
             <div id="progress-container"><div id="progress-bar"></div></div>
             <div style="display:flex; align-items:center;">
                 <input type="text" id="msg-input" placeholder="メッセージ..." style="flex:1; margin:0;">
-                <button id="send-btn">送信</button>
+                <button id="send-btn" style="width:auto; padding:10px 15px; margin-left:5px;">送信</button>
             </div>
             <div style="display:flex; align-items:center; margin-top:5px; font-size:12px; gap:10px;">
                 <label style="cursor:pointer; background:#17a2b8; color:white; padding:5px 10px; border-radius:5px; font-weight:bold;">
@@ -119,26 +134,86 @@
     let roomPasswords = {};
     let userPasswords = {};
 
+    function encodeData(str) {
+        try { return btoa(encodeURIComponent(str)); } catch(e) { return ""; }
+    }
+
+    function decodeData(str) {
+        try { return decodeURIComponent(atob(str)); } catch(e) { return ""; }
+    }
+
+    // 🚀 ページ読み込み時：URLパラメータまたはブラウザ保存（LocalStorage）からの自動ログイン復元
     window.addEventListener('DOMContentLoaded', () => {
         const urlParams = new URLSearchParams(window.location.search);
         const roomParam = urlParams.get('room');
-        if (roomParam) {
-            document.getElementById("room-input").value = roomParam;
+        const roomPassParam = urlParams.get('rp');
+        const userParam = urlParams.get('u');
+        const userPassParam = urlParams.get('up');
+
+        if (userParam) {
+            document.getElementById("name-input").value = decodeData(userParam);
+        }
+        if (userPassParam) {
+            const upDecoded = decodeData(userPassParam);
+            document.getElementById("user-pass-input").value = upDecoded;
+            document.getElementById("user-pass-confirm-input").value = upDecoded;
+        }
+        if (roomParam) document.getElementById("room-input").value = roomParam;
+        if (roomPassParam) document.getElementById("pass-input").value = decodeData(roomPassParam);
+
+        // URLパラメータがない場合はLocalStorageの自動ログイン設定をチェック
+        if (!userParam && localStorage.getItem("chatish_auto") === "true") {
+            document.getElementById("name-input").value = localStorage.getItem("chatish_user") || "";
+            const savedUPass = localStorage.getItem("chatish_upass") || "";
+            document.getElementById("user-pass-input").value = savedUPass;
+            document.getElementById("user-pass-confirm-input").value = savedUPass;
+            document.getElementById("room-input").value = localStorage.getItem("chatish_room") || "";
+            document.getElementById("pass-input").value = localStorage.getItem("chatish_rpass") || "";
+            document.getElementById("auto-login-check").checked = true;
+
+            // 自動ログインが有効な場合は少し遅れて自動入室
+            setTimeout(() => {
+                const r = document.getElementById("room-input").value;
+                if (r && document.getElementById("name-input").value) {
+                    joinRoom(r);
+                }
+            }, 600);
+        }
+
+        if (userParam && roomParam) {
+            setTimeout(() => { joinRoom(roomParam); }, 600);
         }
     });
 
+    // 🔑 自動ログインリンク生成ボタン（左上）
+    document.getElementById("auto-login-link-btn").onclick = () => {
+        if (!currentRoom) return;
+        const name = document.getElementById("name-input").value;
+        const userPass = document.getElementById("user-pass-input").value;
+        const roomPass = document.getElementById("pass-input").value;
+
+        const baseUrl = window.location.href.split('?')[0];
+        let linkUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}`;
+        
+        if (name) linkUrl += `&u=${encodeURIComponent(encodeData(name))}`;
+        if (userPass) linkUrl += `&up=${encodeURIComponent(encodeData(userPass))}`;
+        if (roomPass) linkUrl += `&rp=${encodeURIComponent(encodeData(roomPass))}`;
+
+        navigator.clipboard.writeText(linkUrl).then(() => {
+            alert(`🔑 アカウント情報付き自動ログインリンクをコピーしました！\n\n⚠️ このリンクを知っていれば誰でもあなたのアカウントとして入室できるため、自分用のブックマーク等として大切に扱ってね。`);
+        }).catch(() => {
+            prompt("以下のリンクをコピーしてください：", linkUrl);
+        });
+    };
+
     function requestNotificationPermission() {
-        if ("Notification" in window) {
-            Notification.requestPermission();
-        }
+        if ("Notification" in window) { Notification.requestPermission(); }
     }
 
     function sendNotification(room, senderName, text) {
         if ("Notification" in window && Notification.permission === "granted") {
             const bodyText = text ? text : "写真";
-            try {
-                new Notification(`${room}の${senderName}さんから「${bodyText}」と届きました`, { icon: "./favicon.png" });
-            } catch(e) {}
+            try { new Notification(`${room}の${senderName}さんから「${bodyText}」と届きました`, { icon: "./favicon.png" }); } catch(e) {}
         }
     }
 
@@ -184,8 +259,7 @@
                 try { 
                     const res = JSON.parse(xhr.responseText);
                     if (res && res.data && res.data.url) {
-                        const directUrl = res.data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
-                        resolve(directUrl);
+                        resolve(res.data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/"));
                     } else { resolve(""); }
                 } catch(e) { resolve(""); } 
             };
@@ -436,11 +510,18 @@
     }
 
     function joinRoom(room) {
-        const name = document.getElementById("name-input").value;
+        const name = document.getElementById("name-input").value.trim();
         const userPass = document.getElementById("user-pass-input").value;
+        const userPassConfirm = document.getElementById("user-pass-confirm-input").value;
         const pass = document.getElementById("pass-input").value;
+        const autoLoginChecked = document.getElementById("auto-login-check").checked;
 
         if(!room || !name) return alert("名前と部屋IDを入力してね！");
+
+        // 🔒 パスワード一致チェック
+        if (userPass !== userPassConfirm) {
+            return alert("❌ ユーザーパスワードと確認用パスワードが一致しません！正しく入力してください。");
+        }
 
         // 👤 ユーザー認証チェック
         client.subscribe("user_pass/" + name, () => {
@@ -468,6 +549,21 @@
 
                         if (!existingRoomPass && pass !== "") {
                             client.publish("room_pass/" + room, pass, {retain: true});
+                        }
+
+                        // 自動ログイン設定の保存・削除
+                        if (autoLoginChecked) {
+                            localStorage.setItem("chatish_auto", "true");
+                            localStorage.setItem("chatish_user", name);
+                            localStorage.setItem("chatish_upass", userPass);
+                            localStorage.setItem("chatish_room", room);
+                            localStorage.setItem("chatish_rpass", pass);
+                        } else {
+                            localStorage.removeItem("chatish_auto");
+                            localStorage.removeItem("chatish_user");
+                            localStorage.removeItem("chatish_upass");
+                            localStorage.removeItem("chatish_room");
+                            localStorage.removeItem("chatish_rpass");
                         }
 
                         requestNotificationPermission();
