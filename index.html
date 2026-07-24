@@ -60,7 +60,13 @@
       flex-wrap: wrap;
     }
 
-    /* 絵文字アイコン選択スタイル */
+    /* アイコン選択エリア */
+    .icon-picker-container {
+      border: 1px solid #eee;
+      padding: 10px;
+      border-radius: 6px;
+      background: #fafafa;
+    }
     .icon-selector {
       display: flex;
       gap: 8px;
@@ -73,12 +79,23 @@
       border: 1px solid #ccc;
       border-radius: 6px;
       cursor: pointer;
-      background: #f0f0f0;
+      background: #ffffff;
       user-select: none;
     }
     .icon-option.selected {
       border-color: #007bff;
       background: #e7f1ff;
+    }
+
+    /* 画像プレビュー */
+    .avatar-preview {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid #ccc;
+      display: inline-block;
+      vertical-align: middle;
     }
 
     /* バックアップ管理エリア */
@@ -111,9 +128,9 @@
       gap: 8px;
       margin-bottom: 10px;
     }
-    .user-icon {
-      width: 32px;
-      height: 32px;
+    .user-icon-box {
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
       background: #e7f1ff;
       border: 1px solid #b8daff;
@@ -122,6 +139,12 @@
       justify-content: center;
       font-size: 18px;
       flex-shrink: 0;
+      overflow: hidden;
+    }
+    .user-icon-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
     .msg-content {
       background: white;
@@ -149,17 +172,29 @@
       <input type="text" id="name-input" placeholder="ユーザー名を入力">
     </div>
 
-    <!-- 絵文字アイコン選択機能 -->
+    <!-- アイコン設定（絵文字 または 画像ファイル） -->
     <div class="input-group">
-      <label>アイコン（絵文字）を選択</label>
-      <div class="icon-selector" id="icon-picker">
-        <div class="icon-option selected" data-icon="🐱">🐱</div>
-        <div class="icon-option" data-icon="🐶">🐶</div>
-        <div class="icon-option" data-icon="🦊">🦊</div>
-        <div class="icon-option" data-icon="🐼">🐼</div>
-        <div class="icon-option" data-icon="🤖">🤖</div>
-        <div class="icon-option" data-icon="🚀">🚀</div>
-        <div class="icon-option" data-icon="🎮">🎮</div>
+      <label>アイコン設定</label>
+      <div class="icon-picker-container">
+        <!-- 1. 絵文字から選択 -->
+        <span style="font-size: 11px; color: #666;">絵文字から選択:</span>
+        <div class="icon-selector" id="icon-picker">
+          <div class="icon-option selected" data-icon="🐱">🐱</div>
+          <div class="icon-option" data-icon="🐶">🐶</div>
+          <div class="icon-option" data-icon="🦊">🦊</div>
+          <div class="icon-option" data-icon="🐼">🐼</div>
+          <div class="icon-option" data-icon="🤖">🤖</div>
+          <div class="icon-option" data-icon="🚀">🚀</div>
+        </div>
+
+        <!-- 2. カスタム画像ファイルを指定 -->
+        <div style="margin-top: 10px;">
+          <span style="font-size: 11px; color: #666;">画像ファイルを指定（優先適用）:</span>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+            <input type="file" id="icon-file-input" accept="image/*" style="font-size: 12px;">
+            <button type="button" id="clear-image-btn" class="btn-secondary" style="width: auto; padding: 4px 8px; font-size: 10px;">クリア</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -197,6 +232,11 @@
     <div class="header-bar">
       <button id="back-btn" class="btn-secondary" style="width: auto; padding: 6px 10px;">← 戻る</button>
       
+      <!-- 通知許可ボタン -->
+      <button id="notify-perm-btn" class="btn-warning" style="width: auto; padding: 6px 8px; font-size: 11px;">
+        🔔 通知を有効化
+      </button>
+
       <button id="room-login-link-btn" class="btn-success" style="width: auto; padding: 6px 8px; font-size: 11px;">
         🔑 部屋ログインリンク
       </button>
@@ -213,7 +253,7 @@
       <button id="send-btn" class="btn-primary" style="width: 80px;">送信</button>
     </div>
 
-    <!-- バックアップ機能（ファイル保存・復元） -->
+    <!-- バックアップ機能 -->
     <div class="backup-box">
       <strong>📁 チャットバックアップ管理</strong>
       <div class="backup-buttons">
@@ -237,27 +277,59 @@
     }
 
     let currentRoom = "";
-    let selectedIcon = "🐱"; // デフォルト絵文字アイコン
-    let chatLogData = []; // バックアップ保存用ログデータ
+    let selectedIconEmoji = "🐱"; 
+    let customImageData = ""; // 画像データ（DataURL）
+    let chatLogData = []; 
 
-    // 絵文字アイコン選択のイベント処理
+    // 絵文字アイコン選択のイベント
     document.querySelectorAll(".icon-option").forEach(elem => {
       elem.onclick = () => {
         document.querySelectorAll(".icon-option").forEach(e => e.classList.remove("selected"));
         elem.classList.add("selected");
-        selectedIcon = elem.getAttribute("data-icon");
+        selectedIconEmoji = elem.getAttribute("data-icon");
       };
     });
 
-    function setSelectIcon(icon) {
-      selectedIcon = icon;
-      document.querySelectorAll(".icon-option").forEach(e => {
-        if (e.getAttribute("data-icon") === icon) {
-          e.classList.add("selected");
-        } else {
-          e.classList.remove("selected");
+    // カスタム画像ファイルの読み込み
+    document.getElementById("icon-file-input").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          customImageData = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // 画像クリアボタン
+    document.getElementById("clear-image-btn").onclick = () => {
+      document.getElementById("icon-file-input").value = "";
+      customImageData = "";
+    };
+
+    // 通知許可のリクエスト
+    document.getElementById("notify-perm-btn").onclick = () => {
+      if ("Notification" in window) {
+        Notification.requestPermission().then(permission => {
+          if (permission === "granted") {
+            alert("🔔 通知機能が有効になったよ！");
+          } else {
+            alert("通知が拒否されたか、有効にできませんでした。");
+          }
+        });
+      } else {
+        alert("お使いのブラウザは通知機能に対応していません。");
+      }
+    };
+
+    // デバイスへの通知発行処理
+    function sendNotification(title, body) {
+      if ("Notification" in window && Notification.permission === "granted") {
+        if (document.hidden) { // 画面が開かれていない時のみ通知
+          new Notification(title, { body: body, icon: customImageData || null });
         }
-      });
+      }
     }
 
     // 入室処理
@@ -282,18 +354,26 @@
       document.getElementById("chat-screen").style.display = "block";
 
       if (chatLogData.length === 0) {
-        addMessage("システム", "📢", `${name} さんが入室しました！`);
+        addMessage("システム", { emoji: "📢", img: "" }, `${name} さんが入室しました！`);
       }
     }
 
-    // チャットメッセージ描画＆保存
-    function addMessage(user, icon, text, save = true) {
+    // チャットメッセージ描画
+    function addMessage(user, iconObj, text, save = true) {
       const box = document.getElementById("chat-box");
       const msgDiv = document.createElement("div");
       msgDiv.className = "msg-item";
 
+      // 画像があれば画像表示、なければ絵文字表示
+      let iconHtml = "";
+      if (iconObj && iconObj.img) {
+        iconHtml = `<img src="${iconObj.img}" class="user-icon-img">`;
+      } else {
+        iconHtml = iconObj ? (iconObj.emoji || '👤') : '👤';
+      }
+
       msgDiv.innerHTML = `
-        <div class="user-icon">${icon || '👤'}</div>
+        <div class="user-icon-box">${iconHtml}</div>
         <div>
           <div class="msg-user">${user}</div>
           <div class="msg-content">${text}</div>
@@ -303,8 +383,11 @@
       box.scrollTop = box.scrollHeight;
 
       if (save) {
-        chatLogData.push({ user, icon, text, timestamp: new Date().toISOString() });
+        chatLogData.push({ user, icon: iconObj, text, timestamp: new Date().toISOString() });
       }
+
+      // 通知を発行
+      sendNotification(`${user} (@${currentRoom})`, text);
     }
 
     // メッセージ送信
@@ -314,7 +397,12 @@
       const name = document.getElementById("name-input").value;
       if (!text) return;
       
-      addMessage(name, selectedIcon, text);
+      const iconObj = {
+        emoji: selectedIconEmoji,
+        img: customImageData
+      };
+
+      addMessage(name, iconObj, text);
       input.value = "";
     };
 
@@ -338,7 +426,10 @@
       }
 
       const baseUrl = window.location.href.split('?')[0];
-      let linkUrl = `${baseUrl}?u=${encodeURIComponent(encodeData(name))}&ico=${encodeURIComponent(encodeData(selectedIcon))}`;
+      let linkUrl = `${baseUrl}?u=${encodeURIComponent(encodeData(name))}&ico=${encodeURIComponent(encodeData(selectedIconEmoji))}`;
+      if (customImageData) {
+        linkUrl += `&img=${encodeURIComponent(encodeData(customImageData))}`;
+      }
       if (userPass) {
         linkUrl += `&up=${encodeURIComponent(encodeData(userPass))}`;
       }
@@ -361,7 +452,8 @@
       let linkUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}`;
       
       if (name) linkUrl += `&u=${encodeURIComponent(encodeData(name))}`;
-      if (selectedIcon) linkUrl += `&ico=${encodeURIComponent(encodeData(selectedIcon))}`;
+      if (selectedIconEmoji) linkUrl += `&ico=${encodeURIComponent(encodeData(selectedIconEmoji))}`;
+      if (customImageData) linkUrl += `&img=${encodeURIComponent(encodeData(customImageData))}`;
       if (userPass) linkUrl += `&up=${encodeURIComponent(encodeData(userPass))}`;
       if (roomPass) linkUrl += `&rp=${encodeURIComponent(encodeData(roomPass))}`;
 
@@ -372,7 +464,7 @@
       });
     };
 
-    // 💾 バックアップファイル（JSON）として出力・保存
+    // 💾 バックアップ保存
     document.getElementById("export-btn").onclick = () => {
       if (chatLogData.length === 0) {
         alert("保存するチャット履歴がありません！");
@@ -382,7 +474,6 @@
       const backupData = {
         room: currentRoom,
         user: document.getElementById("name-input").value,
-        icon: selectedIcon,
         messages: chatLogData,
         exportedAt: new Date().toLocaleString()
       };
@@ -396,7 +487,7 @@
       downloadAnchor.remove();
     };
 
-    // 📂 バックアップファイルを選択して復元
+    // 📂 バックアップ復元
     document.getElementById("import-btn").onclick = () => {
       document.getElementById("import-file-input").click();
     };
@@ -410,7 +501,6 @@
         try {
           const importedData = JSON.parse(event.target.result);
           if (importedData.messages && Array.isArray(importedData.messages)) {
-            // チャットエリアとログ配列をリセットして読み込み
             document.getElementById("chat-box").innerHTML = "";
             chatLogData = [];
 
@@ -418,7 +508,7 @@
               addMessage(msg.user, msg.icon, msg.text, true);
             });
 
-            alert(`📂 バックアップファイルを読み込んだよ！（${importedData.messages.length} 件のメッセージ）`);
+            alert(`📂 バックアップを復元したよ！（${importedData.messages.length} 件）`);
           } else {
             alert("ファイル形式が正しくありません。");
           }
@@ -427,7 +517,7 @@
         }
       };
       reader.readAsText(file);
-      e.target.value = ""; // 入力をリセット
+      e.target.value = "";
     });
 
     // 戻るボタン
@@ -439,7 +529,7 @@
       currentRoom = "";
     };
 
-    // ページロード時の処理
+    // ページロード時のURLパラメータ処理
     window.addEventListener('DOMContentLoaded', () => {
       const urlParams = new URLSearchParams(window.location.search);
       const roomParam = urlParams.get('room');
@@ -447,9 +537,12 @@
       const userParam = urlParams.get('u');
       const userPassParam = urlParams.get('up');
       const iconParam = urlParams.get('ico');
+      const imgParam = urlParams.get('img');
 
       if (userParam) document.getElementById("name-input").value = decodeData(userParam);
-      if (iconParam) setSelectIcon(decodeData(iconParam));
+      if (iconParam) selectedIconEmoji = decodeData(iconParam);
+      if (imgParam) customImageData = decodeData(imgParam);
+
       if (userPassParam) {
         const upDecoded = decodeData(userPassParam);
         document.getElementById("user-pass-input").value = upDecoded;
