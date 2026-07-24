@@ -15,7 +15,7 @@
       padding: 20px;
       border-radius: 8px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      max-width: 400px;
+      max-width: 440px;
       margin: 0 auto;
     }
     .input-group {
@@ -27,7 +27,7 @@
       color: #666;
       margin-bottom: 4px;
     }
-    input {
+    input, select {
       width: 100%;
       padding: 8px;
       box-sizing: border-box;
@@ -46,15 +46,95 @@
     .btn-primary { background-color: #007bff; }
     .btn-secondary { background-color: #6c757d; }
     .btn-success { background-color: #28a745; }
-    
+    .btn-warning { background-color: #ffc107; color: #212529; }
+
     #chat-screen {
       display: none;
     }
     .header-bar {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 6px;
       margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    /* 絵文字アイコン選択スタイル */
+    .icon-selector {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+    .icon-option {
+      font-size: 20px;
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #f0f0f0;
+      user-select: none;
+    }
+    .icon-option.selected {
+      border-color: #007bff;
+      background: #e7f1ff;
+    }
+
+    /* バックアップ管理エリア */
+    .backup-box {
+      background: #f1f3f5;
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+    .backup-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    /* チャットメッセージ表示 */
+    .chat-box {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      height: 260px;
+      padding: 10px;
+      overflow-y: auto;
+      background: #fafafa;
+      margin-bottom: 10px;
+    }
+    .msg-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .user-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #e7f1ff;
+      border: 1px solid #b8daff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .msg-content {
+      background: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #eee;
+      font-size: 14px;
+      word-break: break-all;
+    }
+    .msg-user {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 2px;
     }
   </style>
 </head>
@@ -67,6 +147,20 @@
     <div class="input-group">
       <label>ユーザー名</label>
       <input type="text" id="name-input" placeholder="ユーザー名を入力">
+    </div>
+
+    <!-- 絵文字アイコン選択機能 -->
+    <div class="input-group">
+      <label>アイコン（絵文字）を選択</label>
+      <div class="icon-selector" id="icon-picker">
+        <div class="icon-option selected" data-icon="🐱">🐱</div>
+        <div class="icon-option" data-icon="🐶">🐶</div>
+        <div class="icon-option" data-icon="🦊">🦊</div>
+        <div class="icon-option" data-icon="🐼">🐼</div>
+        <div class="icon-option" data-icon="🤖">🤖</div>
+        <div class="icon-option" data-icon="🚀">🚀</div>
+        <div class="icon-option" data-icon="🎮">🎮</div>
+      </div>
     </div>
 
     <div class="input-group">
@@ -89,7 +183,7 @@
       <input type="password" id="pass-input" placeholder="部屋パスワード（任意）">
     </div>
 
-    <!-- ログイン用リンク生成ボタン（部屋には入らない） -->
+    <!-- ログイン用リンク生成ボタン -->
     <button type="button" id="gen-login-link-btn" class="btn-secondary" style="margin-bottom: 8px;">
       🔑 ログイン用のリンクを生成
     </button>
@@ -103,18 +197,34 @@
     <div class="header-bar">
       <button id="back-btn" class="btn-secondary" style="width: auto; padding: 6px 10px;">← 戻る</button>
       
-      <!-- 部屋用ログインリンク生成ボタン -->
       <button id="room-login-link-btn" class="btn-success" style="width: auto; padding: 6px 8px; font-size: 11px;">
-        🔑 この部屋にログインするリンクを生成
+        🔑 部屋ログインリンク
       </button>
     </div>
     
     <h3 id="room-title">部屋: -</h3>
-    <p>チャットルームへようこそ！</p>
+
+    <!-- チャットログ表示エリア -->
+    <div class="chat-box" id="chat-box"></div>
+
+    <!-- メッセージ入力エリア -->
+    <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+      <input type="text" id="msg-input" placeholder="メッセージを入力...">
+      <button id="send-btn" class="btn-primary" style="width: 80px;">送信</button>
+    </div>
+
+    <!-- バックアップ機能（ファイル保存・復元） -->
+    <div class="backup-box">
+      <strong>📁 チャットバックアップ管理</strong>
+      <div class="backup-buttons">
+        <button id="export-btn" class="btn-warning" style="padding: 6px; font-size: 11px;">💾 ファイルへ保存</button>
+        <button id="import-btn" class="btn-secondary" style="padding: 6px; font-size: 11px;">📂 ファイルから復元</button>
+      </div>
+      <input type="file" id="import-file-input" accept=".json" style="display: none;">
+    </div>
   </div>
 
   <script>
-    // エンコード・デコード用の簡易関数
     function encodeData(str) {
       return btoa(encodeURIComponent(str));
     }
@@ -127,8 +237,30 @@
     }
 
     let currentRoom = "";
+    let selectedIcon = "🐱"; // デフォルト絵文字アイコン
+    let chatLogData = []; // バックアップ保存用ログデータ
 
-    // 部屋に入室する処理
+    // 絵文字アイコン選択のイベント処理
+    document.querySelectorAll(".icon-option").forEach(elem => {
+      elem.onclick = () => {
+        document.querySelectorAll(".icon-option").forEach(e => e.classList.remove("selected"));
+        elem.classList.add("selected");
+        selectedIcon = elem.getAttribute("data-icon");
+      };
+    });
+
+    function setSelectIcon(icon) {
+      selectedIcon = icon;
+      document.querySelectorAll(".icon-option").forEach(e => {
+        if (e.getAttribute("data-icon") === icon) {
+          e.classList.add("selected");
+        } else {
+          e.classList.remove("selected");
+        }
+      });
+    }
+
+    // 入室処理
     function joinRoom(roomId) {
       const name = document.getElementById("name-input").value.trim();
       const pass = document.getElementById("user-pass-input").value;
@@ -148,9 +280,45 @@
       document.getElementById("room-title").textContent = `部屋: ${currentRoom}`;
       document.getElementById("login-screen").style.display = "none";
       document.getElementById("chat-screen").style.display = "block";
+
+      if (chatLogData.length === 0) {
+        addMessage("システム", "📢", `${name} さんが入室しました！`);
+      }
     }
 
-    // 「作成して入室」ボタンのクリック時
+    // チャットメッセージ描画＆保存
+    function addMessage(user, icon, text, save = true) {
+      const box = document.getElementById("chat-box");
+      const msgDiv = document.createElement("div");
+      msgDiv.className = "msg-item";
+
+      msgDiv.innerHTML = `
+        <div class="user-icon">${icon || '👤'}</div>
+        <div>
+          <div class="msg-user">${user}</div>
+          <div class="msg-content">${text}</div>
+        </div>
+      `;
+      box.appendChild(msgDiv);
+      box.scrollTop = box.scrollHeight;
+
+      if (save) {
+        chatLogData.push({ user, icon, text, timestamp: new Date().toISOString() });
+      }
+    }
+
+    // メッセージ送信
+    document.getElementById("send-btn").onclick = () => {
+      const input = document.getElementById("msg-input");
+      const text = input.value.trim();
+      const name = document.getElementById("name-input").value;
+      if (!text) return;
+      
+      addMessage(name, selectedIcon, text);
+      input.value = "";
+    };
+
+    // 作成して入室
     document.getElementById("join-btn").onclick = () => {
       const roomId = document.getElementById("room-input").value.trim();
       if (!roomId) {
@@ -160,7 +328,7 @@
       joinRoom(roomId);
     };
 
-    // ログイン画面の「ログイン用のリンクを生成」ボタン（アカウントのみ）
+    // ログイン用リンク生成
     document.getElementById("gen-login-link-btn").onclick = () => {
       const name = document.getElementById("name-input").value.trim();
       const userPass = document.getElementById("user-pass-input").value;
@@ -170,19 +338,19 @@
       }
 
       const baseUrl = window.location.href.split('?')[0];
-      let linkUrl = `${baseUrl}?u=${encodeURIComponent(encodeData(name))}`;
+      let linkUrl = `${baseUrl}?u=${encodeURIComponent(encodeData(name))}&ico=${encodeURIComponent(encodeData(selectedIcon))}`;
       if (userPass) {
         linkUrl += `&up=${encodeURIComponent(encodeData(userPass))}`;
       }
 
       navigator.clipboard.writeText(linkUrl).then(() => {
-        alert(`🔑 アカウントログイン用のリンクをコピーしたよ！\n（※開くと入力欄が自動セットされます）\n\n${linkUrl}`);
+        alert(`🔑 ログイン用のリンクをコピーしたよ！\n\n${linkUrl}`);
       }).catch(() => {
         prompt("以下のリンクをコピーしてね：", linkUrl);
       });
     };
 
-    // チャット画面の「この部屋にログインするリンクを生成」ボタン（部屋直行）
+    // 部屋用ログインリンク生成
     document.getElementById("room-login-link-btn").onclick = () => {
       if (!currentRoom) return;
       const name = document.getElementById("name-input").value;
@@ -193,46 +361,104 @@
       let linkUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}`;
       
       if (name) linkUrl += `&u=${encodeURIComponent(encodeData(name))}`;
+      if (selectedIcon) linkUrl += `&ico=${encodeURIComponent(encodeData(selectedIcon))}`;
       if (userPass) linkUrl += `&up=${encodeURIComponent(encodeData(userPass))}`;
       if (roomPass) linkUrl += `&rp=${encodeURIComponent(encodeData(roomPass))}`;
 
       navigator.clipboard.writeText(linkUrl).then(() => {
-        alert(`🔑 部屋「${currentRoom}」に自動ログイン・入室するリンクをコピーしたよ！\n\n${linkUrl}`);
+        alert(`🔑 部屋「${currentRoom}」にログインするリンクをコピーしたよ！\n\n${linkUrl}`);
       }).catch(() => {
         prompt("以下のリンクをコピーしてね：", linkUrl);
       });
     };
 
+    // 💾 バックアップファイル（JSON）として出力・保存
+    document.getElementById("export-btn").onclick = () => {
+      if (chatLogData.length === 0) {
+        alert("保存するチャット履歴がありません！");
+        return;
+      }
+
+      const backupData = {
+        room: currentRoom,
+        user: document.getElementById("name-input").value,
+        icon: selectedIcon,
+        messages: chatLogData,
+        exportedAt: new Date().toLocaleString()
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `chatish_backup_${currentRoom || 'data'}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    };
+
+    // 📂 バックアップファイルを選択して復元
+    document.getElementById("import-btn").onclick = () => {
+      document.getElementById("import-file-input").click();
+    };
+
+    document.getElementById("import-file-input").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const importedData = JSON.parse(event.target.result);
+          if (importedData.messages && Array.isArray(importedData.messages)) {
+            // チャットエリアとログ配列をリセットして読み込み
+            document.getElementById("chat-box").innerHTML = "";
+            chatLogData = [];
+
+            importedData.messages.forEach(msg => {
+              addMessage(msg.user, msg.icon, msg.text, true);
+            });
+
+            alert(`📂 バックアップファイルを読み込んだよ！（${importedData.messages.length} 件のメッセージ）`);
+          } else {
+            alert("ファイル形式が正しくありません。");
+          }
+        } catch (err) {
+          alert("ファイルの読み込みに失敗しました。");
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = ""; // 入力をリセット
+    });
+
     // 戻るボタン
     document.getElementById("back-btn").onclick = () => {
       document.getElementById("chat-screen").style.display = "none";
       document.getElementById("login-screen").style.display = "block";
+      document.getElementById("chat-box").innerHTML = "";
+      chatLogData = [];
       currentRoom = "";
     };
 
-    // ページ読み込み時のURL解析処理
+    // ページロード時の処理
     window.addEventListener('DOMContentLoaded', () => {
       const urlParams = new URLSearchParams(window.location.search);
       const roomParam = urlParams.get('room');
       const roomPassParam = urlParams.get('rp');
       const userParam = urlParams.get('u');
       const userPassParam = urlParams.get('up');
+      const iconParam = urlParams.get('ico');
 
-      // ユーザー情報があればセット
-      if (userParam) {
-        document.getElementById("name-input").value = decodeData(userParam);
-      }
+      if (userParam) document.getElementById("name-input").value = decodeData(userParam);
+      if (iconParam) setSelectIcon(decodeData(iconParam));
       if (userPassParam) {
         const upDecoded = decodeData(userPassParam);
         document.getElementById("user-pass-input").value = upDecoded;
         document.getElementById("user-pass-confirm-input").value = upDecoded;
       }
       
-      // 部屋情報があればセット
       if (roomParam) document.getElementById("room-input").value = roomParam;
       if (roomPassParam) document.getElementById("pass-input").value = decodeData(roomPassParam);
 
-      // 部屋IDが含まれているURLの時だけ自動で入室する
       if (roomParam && userParam) {
         setTimeout(() => { 
           joinRoom(roomParam); 
