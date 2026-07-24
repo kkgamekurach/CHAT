@@ -14,7 +14,7 @@
         #app { width: 100%; max-width: 450px; height: 100vh; background: var(--app-bg); display: flex; flex-direction: column; overflow: hidden; position: relative; }
         .screen { flex: 1; padding: 20px; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
         .hidden { display: none !important; }
-        input[type="text"] { padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; width: 100%; background: inherit; color: inherit; }
+        input[type="text"], input[type="password"] { padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; width: 100%; background: inherit; color: inherit; }
         button { padding: 10px; margin: 5px; border-radius: 8px; border: none; background: #007bff; color: white; cursor: pointer; font-weight: bold; }
         .input-group { border: 1px dashed #ccc; padding: 10px; border-radius: 8px; margin: 5px 0; background: rgba(0,0,0,0.02); }
         .input-group label { font-size: 12px; font-weight: bold; display: block; margin-bottom: 5px; }
@@ -52,6 +52,7 @@
             Chatish
         </h2>
         <input type="text" id="name-input" placeholder="名前を入力">
+        <input type="password" id="user-pass-input" placeholder="ユーザーパスワード">
         <div class="input-group">
             <label>👤 アイコン画像</label>
             <input type="text" id="icon-input" placeholder="画像のURLを貼り付け">
@@ -59,7 +60,9 @@
             <img id="icon-preview" class="preview-circle">
         </div>
         <input type="text" id="room-input" placeholder="部屋ID">
+        <input type="password" id="pass-input" placeholder="部屋のパスワード（任意）">
         <button id="join-btn">入室</button>
+        <button id="test-notif-btn" style="background:#17a2b8; margin-top:5px;">🔔 通知テスト</button>
         <div class="history-section"><div id="history-list"></div></div>
     </div>
 
@@ -67,12 +70,13 @@
         <div style="display:flex; align-items:center; justify-content: space-between; border-bottom:1px solid #ccc; padding-bottom:8px; background: var(--app-bg); z-index: 10;">
             <div style="display:flex; align-items:center;">
                 <button id="back-btn" style="background:#6c757d; margin:2px;">← 戻る</button>
-                <span id="room-title" style="margin-left:10px; font-weight:bold; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">部屋: -</span>
+                <span id="room-title" style="margin-left:10px; font-weight:bold; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">部屋: -</span>
             </div>
             <div style="display:flex; align-items:center; gap:4px;">
-                <button id="start-call-btn" style="background:#28a745; margin:0; padding:8px 10px; font-size:13px;">📞 通話</button>
-                <button id="end-call-btn" style="background:#dc3545; margin:0; padding:8px 10px; font-size:13px;" class="hidden">❌ 切断</button>
-                <button id="delete-this-room-btn" style="background:#dc3545; margin:0; padding:8px 10px; font-size:13px;">🗑️ 部屋削除</button>
+                <button id="share-link-btn" style="background:#17a2b8; margin:0; padding:8px 8px; font-size:12px;">🔗 招待リンク</button>
+                <button id="start-call-btn" style="background:#28a745; margin:0; padding:8px 8px; font-size:12px;">📞 通話</button>
+                <button id="end-call-btn" style="background:#dc3545; margin:0; padding:8px 8px; font-size:12px;" class="hidden">❌ 切断</button>
+                <button id="delete-this-room-btn" style="background:#dc3545; margin:0; padding:8px 8px; font-size:12px;">🗑️ 部屋削除</button>
             </div>
         </div>
 
@@ -112,22 +116,38 @@
     let myCallId = Math.random().toString(36).substring(2, 11);
     const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     let deleteRequests = {};
+    let roomPasswords = {};
+    let userPasswords = {};
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomParam = urlParams.get('room');
+        if (roomParam) {
+            document.getElementById("room-input").value = roomParam;
+        }
+    });
 
     function requestNotificationPermission() {
-        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+        if ("Notification" in window) {
             Notification.requestPermission();
         }
     }
 
-    // 🔔 指定の文面に合わせた通知処理
     function sendNotification(room, senderName, text) {
         if ("Notification" in window && Notification.permission === "granted") {
             const bodyText = text ? text : "写真";
-            new Notification(`${room}の${senderName}さんから「${bodyText}」と届きました`, {
-                icon: "./favicon.png"
-            });
+            try {
+                new Notification(`${room}の${senderName}さんから「${bodyText}」と届きました`, { icon: "./favicon.png" });
+            } catch(e) {}
         }
     }
+
+    document.getElementById("test-notif-btn").onclick = () => {
+        requestNotificationPermission();
+        const testRoom = document.getElementById("room-input").value || "テスト部屋";
+        const testName = document.getElementById("name-input").value || "テスト名前";
+        setTimeout(() => { sendNotification(testRoom, testName, "テストメッセージです"); }, 500);
+    };
 
     function goBack() {
         closeCall();
@@ -138,6 +158,17 @@
 
     document.getElementById("back-btn").onclick = () => goBack();
     window.onpopstate = () => goBack();
+
+    document.getElementById("share-link-btn").onclick = () => {
+        if (!currentRoom) return;
+        const baseUrl = window.location.href.split('?')[0];
+        const shareUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}`;
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            alert(`🔗 部屋「${currentRoom}」の招待リンクをコピーしました！\n\n${shareUrl}`);
+        }).catch(() => {
+            prompt("以下のリンクをコピーして共有してください：", shareUrl);
+        });
+    };
 
     async function uploadWithProgress(file) {
         const container = document.getElementById("progress-container");
@@ -196,7 +227,11 @@
 
     document.getElementById("name-input").onblur = () => {
         const name = document.getElementById("name-input").value;
-        if(name) { client.subscribe("user_profile/" + name); client.subscribe("user_rooms/" + name); }
+        if(name) {
+            client.subscribe("user_profile/" + name);
+            client.subscribe("user_rooms/" + name);
+            client.subscribe("user_pass/" + name);
+        }
     };
 
     client.on('message', async (topic, message) => {
@@ -209,7 +244,17 @@
                 renderHistoryList(myRooms); 
             } catch(e) { myRooms = []; renderHistoryList(myRooms); } 
         }
-        
+
+        if (topic.startsWith("user_pass/")) {
+            const uName = topic.replace("user_pass/", "");
+            userPasswords[uName] = message.toString();
+        }
+
+        if (topic.startsWith("room_pass/")) {
+            const room = topic.replace("room_pass/", "");
+            roomPasswords[room] = message.toString();
+        }
+
         if(currentRoom && topic === "room_history/" + currentRoom) { 
             try { 
                 const strData = message.toString();
@@ -217,7 +262,6 @@
                     chatHistory = [];
                 } else {
                     const newHistory = JSON.parse(strData);
-                    
                     if (newHistory.length > chatHistory.length) {
                         const lastMsg = newHistory[newHistory.length - 1];
                         if (lastMsg.name !== name) {
@@ -237,15 +281,14 @@
             try {
                 const reqs = JSON.parse(message.toString());
                 deleteRequests = reqs;
-                
                 const usersInRoom = [...new Set(chatHistory.map(m => m.name))];
-                
                 if (usersInRoom.length > 0 && usersInRoom.every(u => deleteRequests[u] === true)) {
                     client.publish("room_history/" + currentRoom, "[]", {retain: true});
                     client.publish("room_delete_req/" + currentRoom, "{}", {retain: true});
+                    client.publish("room_pass/" + currentRoom, "", {retain: true});
                     chatHistory = [];
                     renderMessages();
-                    alert("🤝 全員の同意が確認されたため、部屋とメッセージ履歴が完全削除されました。");
+                    alert("🤝 全員の同意が確認されたため、部屋が完全削除されました。");
                     goBack();
                 }
             } catch(e) {}
@@ -301,13 +344,11 @@
     function deleteMessage(msgId) {
         const myName = document.getElementById("name-input").value;
         const msgIndex = chatHistory.findIndex(m => m.msgId === msgId);
-        
         if (msgIndex !== -1) {
             if (chatHistory[msgIndex].name !== myName) {
                 alert("他の人が送信したメッセージは取り消せません！");
                 return;
             }
-            
             if (confirm("このメッセージの送信を取り消しますか？")) {
                 chatHistory.splice(msgIndex, 1);
                 client.publish("room_history/" + currentRoom, JSON.stringify(chatHistory), {retain: true});
@@ -319,20 +360,14 @@
     function deleteRoomEntirely(roomName) {
         const name = document.getElementById("name-input").value;
         if (!name) return;
-
         if (confirm(`⚠️ 部屋「${roomName}」の削除をリクエストしますか？\n（相手も削除をOKすると完全削除されます）`)) {
             myRooms = myRooms.filter(r => r !== roomName);
             client.publish("user_rooms/" + name, JSON.stringify(myRooms), {retain: true});
             renderHistoryList(myRooms);
-
             deleteRequests[name] = true;
             client.publish("room_delete_req/" + roomName, JSON.stringify(deleteRequests), {retain: true});
-
-            alert(`部屋「${roomName}」の削除リクエストを出しました。相手も削除を同意するとデータが完全に消去されます。`);
-            
-            if (currentRoom === roomName) {
-                goBack();
-            }
+            alert(`部屋「${roomName}」の削除リクエストを出しました。`);
+            if (currentRoom === roomName) goBack();
         }
     }
 
@@ -353,9 +388,7 @@
         chatHistory.forEach(data => {
             const container = document.createElement("div"); 
             container.className = "msg-container";
-            
             let textHtml = data.text ? `<div>${data.text}</div>` : '';
-            
             let imgHtml = '';
             if (data.cloudUrl && typeof data.cloudUrl === 'string' && data.cloudUrl.startsWith('http')) {
                 imgHtml = `<img class="chat-img" src="${data.cloudUrl}">`;
@@ -364,7 +397,6 @@
             const msgBox = document.createElement("div");
             msgBox.className = "msg-box";
             msgBox.innerHTML = `${textHtml}${imgHtml}`;
-            
             if (data.name === myName) {
                 msgBox.title = "クリックして送信取り消し";
                 msgBox.onclick = () => deleteMessage(data.msgId);
@@ -376,7 +408,6 @@
                     <div class="msg-name">${data.name}</div>
                 </div>
             `;
-            
             container.querySelector("div").appendChild(msgBox);
             area.appendChild(container);
         });
@@ -388,7 +419,6 @@
         rooms.forEach(r => { 
             const item = document.createElement("div"); 
             item.className = "history-item"; 
-            
             const clickArea = document.createElement("div");
             clickArea.className = "room-click-area";
             clickArea.textContent = "部屋: " + r;
@@ -397,10 +427,7 @@
             const delBtn = document.createElement("button");
             delBtn.className = "delete-room-btn";
             delBtn.textContent = "削除";
-            delBtn.onclick = (e) => {
-                e.stopPropagation(); 
-                deleteRoomEntirely(r);
-            };
+            delBtn.onclick = (e) => { e.stopPropagation(); deleteRoomEntirely(r); };
 
             item.appendChild(clickArea);
             item.appendChild(delBtn);
@@ -410,19 +437,58 @@
 
     function joinRoom(room) {
         const name = document.getElementById("name-input").value;
-        if(!room || !name) return alert("名前と部屋IDを入れてね！");
-        
-        requestNotificationPermission();
+        const userPass = document.getElementById("user-pass-input").value;
+        const pass = document.getElementById("pass-input").value;
 
-        if (!myRooms.includes(room)) { myRooms.push(room); client.publish("user_rooms/" + name, JSON.stringify(myRooms), {retain: true}); }
-        currentRoom = room; document.getElementById("room-title").textContent = "部屋: " + room;
-        
-        client.subscribe("room_call/" + room);
-        client.subscribe("room_delete_req/" + room);
-        client.subscribe("room_history/" + room, () => {
-            document.getElementById("login-screen").classList.add("hidden");
-            document.getElementById("chat-screen").classList.remove("hidden");
-            if (window.history.state !== "chat") { window.history.pushState("chat", null, ""); }
+        if(!room || !name) return alert("名前と部屋IDを入力してね！");
+
+        // 👤 ユーザー認証チェック
+        client.subscribe("user_pass/" + name, () => {
+            setTimeout(() => {
+                const existingUserPass = userPasswords[name];
+
+                if (existingUserPass && existingUserPass !== "" && existingUserPass !== userPass) {
+                    alert("👤 ユーザーパスワードが違います！正しいパスワードを入力してください。");
+                    return;
+                }
+
+                if (!existingUserPass && userPass !== "") {
+                    client.publish("user_pass/" + name, userPass, {retain: true});
+                }
+
+                // 🔒 部屋パスワードチェック
+                client.subscribe("room_pass/" + room, () => {
+                    setTimeout(() => {
+                        const existingRoomPass = roomPasswords[room];
+                        
+                        if (existingRoomPass && existingRoomPass !== "" && existingRoomPass !== pass) {
+                            alert("🔒 部屋のパスワードが違います！正しいパスワードを入力してください。");
+                            return;
+                        }
+
+                        if (!existingRoomPass && pass !== "") {
+                            client.publish("room_pass/" + room, pass, {retain: true});
+                        }
+
+                        requestNotificationPermission();
+
+                        if (!myRooms.includes(room)) { 
+                            myRooms.push(room); 
+                            client.publish("user_rooms/" + name, JSON.stringify(myRooms), {retain: true}); 
+                        }
+                        currentRoom = room; 
+                        document.getElementById("room-title").textContent = "部屋: " + room;
+                        
+                        client.subscribe("room_call/" + room);
+                        client.subscribe("room_delete_req/" + room);
+                        client.subscribe("room_history/" + room, () => {
+                            document.getElementById("login-screen").classList.add("hidden");
+                            document.getElementById("chat-screen").classList.remove("hidden");
+                            if (window.history.state !== "chat") { window.history.pushState("chat", null, ""); }
+                        });
+                    }, 300);
+                });
+            }, 300);
         });
     }
 
